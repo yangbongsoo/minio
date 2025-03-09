@@ -65,5 +65,6 @@ func ansiRestoreAttributes() {
 
 // logIgnoreError if true,the error will ignore.
 func logIgnoreError(err error) bool {
-	return err == nil || errors.Is(err, context.Canceled) || errors.Is(err, http.ErrServerClosed) || err.Error() == "drive not found"
+	fmt.Printf("[YBS] logIgnoreError.error: %v", err)
+	return err == nil || errors.Is(err, context.Canceled) || errors.Is(err, http.ErrServerClosed)
 }

@@ -1243,6 +1243,7 @@ func (er erasureObjects) PutObject(ctx context.Context, bucket string, object st
 
 // putObject wrapper for erasureObjects PutObject
 func (er erasureObjects) putObject(ctx context.Context, bucket string, object string, r *PutObjReader, opts ObjectOptions) (objInfo ObjectInfo, err error) {
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] erasure-object.putObject started for %s/%s", bucket, object))
 	if !opts.NoAuditLog {
 		auditObjectErasureSet(ctx, "PutObject", object, &er)
 	}
@@ -1288,6 +1289,7 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 	if opts.MaxParity {
 		parityDrives = len(storageDisks) / 2
 	}
+	// TODO 이건 어떤 상황?
 	if !opts.MaxParity && globalStorageClass.AvailabilityOptimized() {
 		// If we have offline disks upgrade the number of erasure codes for this object.
 		parityOrig := parityDrives
@@ -1316,6 +1318,7 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 			userDefined[minIOErasureUpgraded] = strconv.Itoa(parityOrig) + "->" + strconv.Itoa(parityDrives)
 		}
 	}
+	// 8-5 해서 3 되겠지
 	dataDrives := len(storageDisks) - parityDrives
 
 	// we now know the number of blocks this object needs for data and parity.
@@ -1378,6 +1381,7 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 	partName := "part.1"
 	tempErasureObj := pathJoin(uniqueID, fi.DataDir, partName)
 
+	// multi part 임시들 제거 EC 작업후 다시 재분배
 	defer er.deleteAll(context.Background(), minioMetaTmpBucket, tempObj)
 
 	var inlineBuffers []*bytes.Buffer
