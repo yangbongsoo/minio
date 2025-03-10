@@ -1243,7 +1243,7 @@ func (er erasureObjects) PutObject(ctx context.Context, bucket string, object st
 
 // putObject wrapper for erasureObjects PutObject
 func (er erasureObjects) putObject(ctx context.Context, bucket string, object string, r *PutObjReader, opts ObjectOptions) (objInfo ObjectInfo, err error) {
-	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] erasure-object.putObject started for %s/%s", bucket, object))
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] erasure-object.putObject started for bucket:%s(object:%s)\n", bucket, object))
 	if !opts.NoAuditLog {
 		auditObjectErasureSet(ctx, "PutObject", object, &er)
 	}

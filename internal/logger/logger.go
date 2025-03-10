@@ -262,9 +262,9 @@ func LogAlwaysIf(ctx context.Context, subsystem string, err error, errKind ...in
 // the execution of the server, if it is not an
 // ignored error.
 func LogIf(ctx context.Context, subsystem string, err error, errKind ...interface{}) {
-	if logIgnoreError(err) {
-		return
-	}
+	//if logIgnoreError(err) {
+	//	return
+	//}
 	logIf(ctx, subsystem, err, errKind...)
 }
 

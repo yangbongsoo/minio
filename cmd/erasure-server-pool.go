@@ -1081,7 +1081,7 @@ func (z *erasureServerPools) GetObjectInfo(ctx context.Context, bucket, object s
 
 // PutObject - writes an object to least used erasure pool.
 func (z *erasureServerPools) PutObject(ctx context.Context, bucket string, object string, data *PutObjReader, opts ObjectOptions) (ObjectInfo, error) {
-	logger.LogIf(ctx, "erasure-server-pool.PutObject", fmt.Errorf("[YBS] erasure-server-pool.PutObject start %s/%s", bucket, object))
+	logger.LogIf(ctx, "erasure-server-pool.PutObject", fmt.Errorf("[YBS] erasure-server-pool.PutObject start bucket:%s(object:%s)\n", bucket, object))
 	// Validate put object input args.
 	if err := checkPutObjectArgs(ctx, bucket, object); err != nil {
 		return ObjectInfo{}, err
@@ -1106,10 +1106,10 @@ func (z *erasureServerPools) PutObject(ctx context.Context, bucket string, objec
 		}
 	}
 
-	for _, pool := range z.serverPools {
-		logger.Info("[YBS] serverPools.defaultParityCount:", pool.defaultParityCount)
-	}
-	logger.LogIf(ctx, "erasure-server-pool.PutObject", fmt.Errorf("[YBS] erasure-server-pool.serverPools idx(%d) %s", idx, z.serverPools))
+	//for _, pool := range z.serverPools {
+	//	logger.Info("[YBS] serverPools.defaultParityCount:", pool.defaultParityCount)
+	//}
+	logger.LogIf(ctx, "erasure-server-pool.PutObject", fmt.Errorf("[YBS] erasure-server-pool.serverPools idx(%d) %v\n", idx, z.serverPools))
 	return z.serverPools[idx].PutObject(ctx, bucket, object, data, opts)
 }
 
