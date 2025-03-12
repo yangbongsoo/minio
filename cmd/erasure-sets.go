@@ -192,6 +192,7 @@ func (s *erasureSets) Legacy() (ok bool) {
 // connectDisks - attempt to connect all the endpoints, loads format
 // and re-arranges the disks in proper position.
 func (s *erasureSets) connectDisks(log bool) {
+	logger.LogIf(context.Background(), "erasure-sets.connectDisks", fmt.Errorf("[YBS] connectDisks 시작\n"))
 	defer func() {
 		s.lastConnectDisksOpTime = time.Now()
 	}()
@@ -200,6 +201,7 @@ func (s *erasureSets) connectDisks(log bool) {
 	diskMap := s.getDiskMap()
 	for _, endpoint := range s.endpoints.Endpoints {
 		cdisk := diskMap[endpoint]
+		logger.LogIf(context.Background(), "erasure-sets.connectDisks", fmt.Errorf("[YBS] cdisk: %v\n", cdisk))
 		if cdisk != nil && cdisk.IsOnline() {
 			if s.lastConnectDisksOpTime.IsZero() {
 				continue
@@ -260,6 +262,9 @@ func (s *erasureSets) connectDisks(log bool) {
 			}
 
 			disk.SetDiskID(format.Erasure.This)
+			logger.LogIf(context.Background(), "erasure-sets.connectDisks", fmt.Errorf("[YBS] disk.Endpoint(): %s\n", disk.Endpoint()))
+			logger.LogIf(context.Background(), "erasure-sets.connectDisks", fmt.Errorf("[YBS] [setIndex:%d][diskIndex%d]\n", setIndex, diskIndex))
+			logger.LogIf(context.Background(), "erasure-sets.connectDisks", fmt.Errorf("[YBS] s.erasureDisks[setIndex][diskIndex]: %v\n", s.erasureDisks[setIndex][diskIndex]))
 			s.erasureDisks[setIndex][diskIndex] = disk
 
 			if disk.IsLocal() {
@@ -281,6 +286,7 @@ func (s *erasureSets) connectDisks(log bool) {
 // endpoints by reconnecting them and making sure to place them into right position in
 // the set topology, this monitoring happens at a given monitoring interval.
 func (s *erasureSets) monitorAndConnectEndpoints(ctx context.Context, monitorInterval time.Duration) {
+	logger.LogIf(ctx, "erasure-sets.monitorAndConnectEndpoints", fmt.Errorf("[YBS] monitorAndConnectEndpoints 시작\n"))
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	time.Sleep(time.Duration(r.Float64() * float64(time.Second)))

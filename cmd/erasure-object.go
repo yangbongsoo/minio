@@ -1280,16 +1280,41 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 	userDefined := cloneMSS(opts.UserDefined)
 
 	storageDisks := er.getDisks()
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] storageDisks 갯수 : %d\n", len(storageDisks)))
+	for i, disk := range storageDisks {
+		if disk == nil {
+			logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] 디스크[%d]: nil\n", i))
+			continue
+		}
+
+		isOnline := disk.IsOnline()
+		isLocal := disk.IsLocal()
+		diskInfo := disk.String()
+		logger.LogIf(
+			ctx,
+			"erasure-object.PutObject",
+			fmt.Errorf("[YBS] 디스크[%d]: %s, 온라인 상태: %v, 로컬 상태: %v\n", i, diskInfo, isOnline, isLocal),
+		)
+	}
 
 	// Get parity and data drive count based on storage class metadata
 	parityDrives := globalStorageClass.GetParityForSC(userDefined[xhttp.AmzStorageClass])
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives step1: %d\n", parityDrives))
+
 	if parityDrives < 0 {
 		parityDrives = er.defaultParityCount
 	}
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives step2: %d\n", parityDrives))
 	if opts.MaxParity {
 		parityDrives = len(storageDisks) / 2
 	}
-	// TODO 이건 어떤 상황?
+	logger.LogIf(
+		ctx,
+		"erasure-object.PutObject",
+		fmt.Errorf("[YBS] parityDrives step3: %d, opts.MaxParity: %v, globalStorageClass.AvailabilityOptimized(): %v\n",
+			parityDrives, opts.MaxParity, globalStorageClass.AvailabilityOptimized()),
+	)
+
 	if !opts.MaxParity && globalStorageClass.AvailabilityOptimized() {
 		// If we have offline disks upgrade the number of erasure codes for this object.
 		parityOrig := parityDrives
@@ -1303,6 +1328,8 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 			}
 		}
 
+		logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] offlineDrives: %d\n", offlineDrives))
+		logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] len(storageDisks)+1)/2: %d\n", (len(storageDisks)+1)/2))
 		if offlineDrives >= (len(storageDisks)+1)/2 {
 			// if offline drives are more than 50% of the drives
 			// we have no quorum, we shouldn't proceed just
@@ -1310,6 +1337,7 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 			return ObjectInfo{}, toObjectErr(errErasureWriteQuorum, bucket, object)
 		}
 
+		logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives >= len(storageDisks)/2: %d >= %d\n", parityDrives, len(storageDisks)/2))
 		if parityDrives >= len(storageDisks)/2 {
 			parityDrives = len(storageDisks) / 2
 		}
@@ -1317,20 +1345,27 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 		if parityOrig != parityDrives {
 			userDefined[minIOErasureUpgraded] = strconv.Itoa(parityOrig) + "->" + strconv.Itoa(parityDrives)
 		}
-	}
-	// 8-5 해서 3 되겠지
-	dataDrives := len(storageDisks) - parityDrives
 
+		logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives step4: %d\n", parityDrives))
+	}
+
+	dataDrives := len(storageDisks) - parityDrives
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] dataDrives: %d\n", dataDrives))
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] len(storageDisks): %d\n", len(storageDisks)))
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives: %d\n", parityDrives))
 	// we now know the number of blocks this object needs for data and parity.
 	// writeQuorum is dataBlocks + 1
 	writeQuorum := dataDrives
 	if dataDrives == parityDrives {
 		writeQuorum++
 	}
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] writeQuorum: %d\n", writeQuorum))
 
 	// Initialize parts metadata
 	partsMetadata := make([]FileInfo, len(storageDisks))
 
+	// AvailabilityOptimized 모드 비활성화인 경우, EC 설정: EC9 (4+5) 가 된다고???
+	// AvailabilityOptimized 모드 활성화인 경우, EC 설정: EC9 (5+4) 가 된다고???
 	fi := newFileInfo(pathJoin(bucket, object), dataDrives, parityDrives)
 	fi.VersionID = opts.VersionID
 	if opts.Versioned && fi.VersionID == "" {
@@ -1355,7 +1390,24 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 	// Order disks according to erasure distribution
 	var onlineDisks []StorageAPI
 	onlineDisks, partsMetadata = shuffleDisksAndPartsMetadata(storageDisks, partsMetadata, fi)
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] onlineDisks 개수: %d", len(onlineDisks)))
+	for i, disk := range onlineDisks {
+		if disk == nil {
+			logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] onlineDisks[%d]: nil", i))
+		} else {
+			logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] onlineDisks[%d]: %s, 온라인 상태: %v", i, disk.String(), disk.IsOnline()))
+		}
+	}
 
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] partsMetadata 개수: %d", len(partsMetadata)))
+	for i, meta := range partsMetadata {
+		logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] partsMetadata[%d]: DataBlocks=%d, ParityBlocks=%d, Distribution=%v",
+			i, meta.Erasure.DataBlocks, meta.Erasure.ParityBlocks, meta.Erasure.Distribution))
+	}
+
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] fi.Erasure.DataBlocks: %d", fi.Erasure.DataBlocks))
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] fi.Erasure.ParityBlocks: %d", fi.Erasure.ParityBlocks))
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] fi.Erasure.BlockSize: %d", fi.Erasure.BlockSize))
 	erasure, err := NewErasure(ctx, fi.Erasure.DataBlocks, fi.Erasure.ParityBlocks, fi.Erasure.BlockSize)
 	if err != nil {
 		return ObjectInfo{}, toObjectErr(err, bucket, object)

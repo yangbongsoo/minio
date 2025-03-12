@@ -271,7 +271,7 @@ func shuffleDisksAndPartsMetadataByIndex(disks []StorageAPI, metaArr []FileInfo,
 func shuffleDisksAndPartsMetadata(disks []StorageAPI, partsMetadata []FileInfo, fi FileInfo) (shuffledDisks []StorageAPI, shuffledPartsMetadata []FileInfo) {
 	shuffledDisks = make([]StorageAPI, len(disks))
 	shuffledPartsMetadata = make([]FileInfo, len(partsMetadata))
-	distribution := fi.Erasure.Distribution
+	distribution := fi.Erasure.Distribution // 분산 패턴은 newFileInfo 함수에서 생성된다.
 
 	init := fi.ModTime.IsZero()
 	// Shuffle slice xl metadata for expected distribution.
