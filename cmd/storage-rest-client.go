@@ -39,6 +39,7 @@ import (
 	xhttp "github.com/minio/minio/internal/http"
 	"github.com/minio/minio/internal/ioutil"
 	xioutil "github.com/minio/minio/internal/ioutil"
+	"github.com/minio/minio/internal/logger"
 	"github.com/minio/minio/internal/rest"
 	xnet "github.com/minio/pkg/v3/net"
 	xbufio "github.com/philhofer/fwd"
@@ -221,6 +222,7 @@ func (client *storageRESTClient) LastConn() time.Time {
 }
 
 func (client *storageRESTClient) IsLocal() bool {
+	logger.LogIf(context.Background(), "storage-rest-client.go IsLocal()", fmt.Errorf("[YBS] IsLocal 호출. return false 하드코딩\n"))
 	return false
 }
 

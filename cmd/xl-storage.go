@@ -419,6 +419,7 @@ func (s *xlStorage) LastConn() time.Time {
 }
 
 func (s *xlStorage) IsLocal() bool {
+	logger.LogIf(context.Background(), "xl-storage.go IsLocal()", fmt.Errorf("[YBS] IsLocal 호출. return true 하드코딩\n"))
 	return true
 }
 

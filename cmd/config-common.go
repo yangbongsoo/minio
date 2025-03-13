@@ -81,7 +81,7 @@ func saveConfigWithOpts(ctx context.Context, store objectIO, configFile string, 
 }
 
 func saveConfig(ctx context.Context, store objectIO, configFile string, data []byte) error {
-	return saveConfigWithOpts(ctx, store, configFile, data, ObjectOptions{MaxParity: true})
+	return saveConfigWithOpts(ctx, store, configFile, data, ObjectOptions{MaxParity: false})
 }
 
 func checkConfig(ctx context.Context, objAPI ObjectLayer, configFile string) error {

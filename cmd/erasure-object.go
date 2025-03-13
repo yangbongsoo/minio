@@ -1305,6 +1305,7 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 		parityDrives = er.defaultParityCount
 	}
 	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives step2: %d\n", parityDrives))
+	opts.MaxParity = false
 	if opts.MaxParity {
 		parityDrives = len(storageDisks) / 2
 	}

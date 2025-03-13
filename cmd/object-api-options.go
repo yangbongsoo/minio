@@ -319,7 +319,11 @@ func delOpts(ctx context.Context, r *http.Request, bucket, object string) (opts 
 
 // get ObjectOptions for PUT calls from encryption headers and metadata
 func putOptsFromReq(ctx context.Context, r *http.Request, bucket, object string, metadata map[string]string) (opts ObjectOptions, err error) {
-	return putOpts(ctx, bucket, object, r.Form.Get(xhttp.VersionID), r.Header, metadata)
+	objectOptions, err := putOpts(ctx, bucket, object, r.Form.Get(xhttp.VersionID), r.Header, metadata)
+	if err == nil {
+		fmt.Printf("[YBS] object-api-options.go putOptsFromReq objectOptions.MaxParity: %v\n", objectOptions.MaxParity)
+	}
+	return objectOptions, err
 }
 
 func putOpts(ctx context.Context, bucket, object, vid string, hdrs http.Header, metadata map[string]string) (opts ObjectOptions, err error) {

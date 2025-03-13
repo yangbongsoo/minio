@@ -101,6 +101,7 @@ type ObjectOptions struct {
 	Speedtest bool // object call specifically meant for SpeedTest code, set to 'true' when invoked by SpeedtestHandler.
 
 	// Use the maximum parity (N/2), used when saving server configuration files
+	// TODO: 이 설정을 false 로 수정
 	MaxParity bool
 
 	// Provides a per object encryption function, allowing metadata encryption.
