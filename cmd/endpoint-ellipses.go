@@ -503,7 +503,6 @@ func createServerEndpoints(serverAddr string, poolArgs []poolDisksLayout, legacy
 		return nil, -1, errInvalidArgument
 	}
 
-	// TODO: 확인 필요
 	poolEndpoints, setupType, err := CreatePoolEndpoints(serverAddr, poolArgs...)
 	if err != nil {
 		return nil, -1, err

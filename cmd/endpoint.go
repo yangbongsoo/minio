@@ -18,6 +18,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -952,6 +953,9 @@ func CreatePoolEndpoints(serverAddr string, poolsLayout ...poolDisksLayout) ([]E
 
 	// For single arg, return single drive EC setup.
 	if isSingleDriveLayout(poolsLayout...) {
+		logger.LogIf(context.Background(), "endpoint.CreatePoolEndpoints",
+			fmt.Errorf("[YBS-Start] isSingleDriveLayout\n"))
+
 		endpoint, err := NewEndpoint(poolsLayout[0].layout[0][0])
 		if err != nil {
 			return nil, setupType, err
@@ -981,7 +985,8 @@ func CreatePoolEndpoints(serverAddr string, poolsLayout ...poolDisksLayout) ([]E
 	}
 
 	uniqueArgs := set.NewStringSet()
-
+	logger.LogIf(context.Background(), "endpoint.CreatePoolEndpoints",
+		fmt.Errorf("[YBS-Start] isNotSingleDriveLayout\n"))
 	for poolIdx, pool := range poolsLayout {
 		var endpoints Endpoints
 		for setIdx, setLayout := range pool.layout {

@@ -393,9 +393,15 @@ func serverHandleCmdArgs(ctxt serverCtxt) {
 	// Register root CAs for remote ENVs
 	env.RegisterGlobalCAs(globalRootCAs)
 
+	logger.LogIf(context.Background(), "server-main.serverHandleCmdArgs", fmt.Errorf("[YBS-Start] globalMinioAddr : %s\n", globalMinioAddr))
+	logger.LogIf(context.Background(), "server-main.serverHandleCmdArgs", fmt.Errorf("[YBS-Start] ctxt.Layout: %#v\n", ctxt.Layout))
+
 	globalEndpoints, setupType, err = createServerEndpoints(globalMinioAddr, ctxt.Layout.pools, ctxt.Layout.legacy)
+	logger.LogIf(context.Background(), "server-main.serverHandleCmdArgs", fmt.Errorf("[YBS-Start] setupType: %d\n", setupType))
+	logger.LogIf(context.Background(), "server-main.serverHandleCmdArgs", fmt.Errorf("[YBS-Start] globalEndpoints: %#v\n", globalEndpoints))
 	logger.FatalIf(err, "Invalid command line arguments")
 	globalNodes = globalEndpoints.GetNodes()
+	logger.LogIf(context.Background(), "server-main.serverHandleCmdArgs", fmt.Errorf("[YBS-Start] globalNodes: %#v\n", globalNodes))
 
 	globalIsErasure = (setupType == ErasureSetupType)
 	globalIsDistErasure = (setupType == DistErasureSetupType)
@@ -776,11 +782,12 @@ func serverMain(ctx *cli.Context) {
 	// Handle early server environment vars
 	serverHandleEarlyEnvVars()
 
+	// TODO: 여기서 IDC 정보 가져와서 셋팅하는 구조
 	// Handle all server command args and build the disks layout
 	bootstrapTrace("serverHandleCmdArgs", func() {
 		err := buildServerCtxt(ctx, &globalServerCtxt)
 		logger.FatalIf(err, "Unable to prepare the list of endpoints")
-
+		logger.LogIf(context.Background(), "server-main.serverMain", fmt.Errorf("[YBS-Start] globalServerCtxt : %#v\n", globalServerCtxt))
 		serverHandleCmdArgs(globalServerCtxt)
 	})
 

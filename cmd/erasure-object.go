@@ -1305,6 +1305,7 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 		parityDrives = er.defaultParityCount
 	}
 	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives step2: %d\n", parityDrives))
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] false 강제전, opts.MaxParity: %v\n", opts.MaxParity))
 	opts.MaxParity = false
 	if opts.MaxParity {
 		parityDrives = len(storageDisks) / 2
@@ -1339,6 +1340,7 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 		}
 
 		logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives >= len(storageDisks)/2: %d >= %d\n", parityDrives, len(storageDisks)/2))
+		// parity 가 절반 이상으로 올라가진 않는다
 		if parityDrives >= len(storageDisks)/2 {
 			parityDrives = len(storageDisks) / 2
 		}
@@ -1365,8 +1367,6 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 	// Initialize parts metadata
 	partsMetadata := make([]FileInfo, len(storageDisks))
 
-	// AvailabilityOptimized 모드 비활성화인 경우, EC 설정: EC9 (4+5) 가 된다고???
-	// AvailabilityOptimized 모드 활성화인 경우, EC 설정: EC9 (5+4) 가 된다고???
 	fi := newFileInfo(pathJoin(bucket, object), dataDrives, parityDrives)
 	fi.VersionID = opts.VersionID
 	if opts.Versioned && fi.VersionID == "" {

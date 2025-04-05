@@ -435,8 +435,10 @@ func buildServerCtxt(ctx *cli.Context, ctxt *serverCtxt) (err error) {
 	ctxt.UserTimeout = ctx.Duration("conn-user-timeout")
 
 	if conf := ctx.String("config"); len(conf) > 0 {
+		logger.LogIf(context.Background(), "common-main.buildServerCtxt", fmt.Errorf("[YBS-Start] mergeServerCtxtFromConfigFile ctxt : %#v\n", ctxt))
 		err = mergeServerCtxtFromConfigFile(conf, ctxt)
 	} else {
+		logger.LogIf(context.Background(), "common-main.buildServerCtxt", fmt.Errorf("[YBS-Start] mergeDisksLayoutFromArgs : %#v, ctxt : %#v\n", serverCmdArgs(ctx), ctxt))
 		err = mergeDisksLayoutFromArgs(serverCmdArgs(ctx), ctxt)
 	}
 
