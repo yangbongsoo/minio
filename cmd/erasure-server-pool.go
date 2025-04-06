@@ -1107,9 +1107,6 @@ func (z *erasureServerPools) PutObject(ctx context.Context, bucket string, objec
 		}
 	}
 
-	//for _, pool := range z.serverPools {
-	//	logger.Info("[YBS] serverPools.defaultParityCount:", pool.defaultParityCount)
-	//}
 	logger.LogIf(ctx, "erasure-server-pool.PutObject", fmt.Errorf("[YBS] erasure-server-pool.serverPools idx(%d) %v\n", idx, z.serverPools))
 	return z.serverPools[idx].PutObject(ctx, bucket, object, data, opts)
 }

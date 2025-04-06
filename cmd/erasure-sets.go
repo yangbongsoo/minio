@@ -192,16 +192,17 @@ func (s *erasureSets) Legacy() (ok bool) {
 // connectDisks - attempt to connect all the endpoints, loads format
 // and re-arranges the disks in proper position.
 func (s *erasureSets) connectDisks(log bool) {
-	logger.LogIf(context.Background(), "erasure-sets.connectDisks", fmt.Errorf("[YBS] connectDisks 시작\n"))
+	//logger.LogIf(context.Background(), "erasure-sets.connectDisks", fmt.Errorf("[YBS] connectDisks 시작\n"))
 	defer func() {
 		s.lastConnectDisksOpTime = time.Now()
 	}()
 
+	// TODO: 수정
 	var wg sync.WaitGroup
 	diskMap := s.getDiskMap()
 	for _, endpoint := range s.endpoints.Endpoints {
 		cdisk := diskMap[endpoint]
-		logger.LogIf(context.Background(), "erasure-sets.connectDisks", fmt.Errorf("[YBS] cdisk: %v\n", cdisk))
+		//logger.LogIf(context.Background(), "erasure-sets.connectDisks", fmt.Errorf("[YBS] cdisk: %v\n", cdisk))
 		if cdisk != nil && cdisk.IsOnline() {
 			if s.lastConnectDisksOpTime.IsZero() {
 				continue

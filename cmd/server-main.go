@@ -928,6 +928,10 @@ func serverMain(ctx *cli.Context) {
 		}
 	})
 
+	bootstrapTrace("[YBS] startIDCTopologyMonitor", func() {
+		startIDCTopologyMonitor(GlobalContext)
+	})
+
 	for _, n := range globalNodes {
 		nodeName := n.Host
 		if n.IsLocal {

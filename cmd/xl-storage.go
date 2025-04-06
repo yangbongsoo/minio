@@ -398,6 +398,7 @@ func (s *xlStorage) String() string {
 }
 
 func (s *xlStorage) Hostname() string {
+	logger.LogIf(context.Background(), "xl-storage.go Hostname()", fmt.Errorf("[YBS] Hostname 호출 : %v \n", s.endpoint.Host))
 	return s.endpoint.Host
 }
 

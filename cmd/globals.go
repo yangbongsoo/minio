@@ -172,6 +172,27 @@ type serverCtxt struct {
 	Layout disksLayout
 }
 
+type IDCNodeInfo struct {
+	Node       string `json:"node"`
+	NodeStatus string `json:"nodeStatus"`
+	Pod        string `json:"pod"`
+	PodStatus  string `json:"podStatus"`
+}
+
+type IDCInfo struct {
+	IDCNodeInfos      []IDCNodeInfo // IDC에 속한 노드 목록
+	TotalNodeCount    int           // 전체 노드 수
+	NotReadyNodeCount int           // NotReady 상태인 노드 수
+	IsActive          bool          // IDC 활성 상태 (75% 이상 Ready일 때 true)
+}
+
+type GlobalIDCState struct {
+	sync.RWMutex
+	IDCInfoMap    map[string]*IDCInfo // IDC 이름별 상세 정보
+	LastCheckTime time.Time           // 마지막 토폴로지 확인 시간
+	TopologyPath  string              // 토폴로지 파일 경로
+}
+
 var (
 	// Global user opts context
 	globalServerCtxt serverCtxt
@@ -460,7 +481,40 @@ var (
 	globalDynamicAPIPort bool
 
 	// Add new variable global values here.
+	globalIDCState = GlobalIDCState{
+		IDCInfoMap:   make(map[string]*IDCInfo),
+		TopologyPath: "/tmp/minio/topology/idc-topology.json",
+	}
 )
+
+func GetIDCInfo(idcName string) (*IDCInfo, bool) {
+	globalIDCState.RLock()
+	defer globalIDCState.RUnlock()
+	info, ok := globalIDCState.IDCInfoMap[idcName]
+	if !ok {
+		return nil, false
+	}
+	// 방어적 복사본 반환 (포인터지만 내부 슬라이스는 복사되지 않음)
+	// 필요하다면 더 깊은 복사 고려
+	idcCopy := *info
+	return &idcCopy, true
+}
+
+func GetAllIDCInfo() map[string]*IDCInfo {
+	globalIDCState.RLock()
+	defer globalIDCState.RUnlock()
+	// 방어적 복사본 생성
+	idcInfoMapCopy := make(map[string]*IDCInfo)
+	for name, idcInfo := range globalIDCState.IDCInfoMap {
+		idcInfoCopy := *idcInfo // IDCInfo 구조체 복사
+		// 필요시 Nodes 슬라이스도 깊은 복사
+		// nodesCopy := make([]IDCNodeInfo, len(info.Nodes))
+		// copy(nodesCopy, info.Nodes)
+		// infoCopy.Nodes = nodesCopy
+		idcInfoMapCopy[name] = &idcInfoCopy
+	}
+	return idcInfoMapCopy
+}
 
 var globalAuthPluginMutex sync.Mutex
 
