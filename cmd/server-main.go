@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -397,7 +398,23 @@ func serverHandleCmdArgs(ctxt serverCtxt) {
 	logger.LogIf(context.Background(), "server-main.serverHandleCmdArgs", fmt.Errorf("[YBS-Start] ctxt.Layout: %#v\n", ctxt.Layout))
 
 	globalEndpoints, setupType, err = createServerEndpoints(globalMinioAddr, ctxt.Layout.pools, ctxt.Layout.legacy)
-	logger.LogIf(context.Background(), "server-main.serverHandleCmdArgs", fmt.Errorf("[YBS-Start] setupType: %d\n", setupType))
+	logger.LogIf(context.Background(), "server-main.serverHandleCmdArgs", fmt.Errorf("[YBS-Start] setupType: %d", setupType))
+
+	endpointsJSON, err := json.MarshalIndent(globalEndpoints, "", "  ")
+	if err != nil {
+		logger.LogIf(context.Background(), "server-main.serverHandleCmdArgs", fmt.Errorf("[YBS-Start] Error marshaling globalEndpoints: %v", err))
+	} else {
+		logger.LogIf(context.Background(), "server-main.serverHandleCmdArgs", fmt.Errorf("[YBS-Start] globalEndpoints:\n%s", string(endpointsJSON)))
+	}
+
+	globalNodes = globalEndpoints.GetNodes()
+	nodesJSON, err := json.MarshalIndent(globalNodes, "", "  ")
+	if err != nil {
+		logger.LogIf(context.Background(), "server-main.serverHandleCmdArgs", fmt.Errorf("[YBS-Start] Error marshaling globalNodes: %v", err))
+	} else {
+		logger.LogIf(context.Background(), "server-main.serverHandleCmdArgs", fmt.Errorf("[YBS-Start] globalNodes:\n%s", string(nodesJSON)))
+	}
+
 	logger.LogIf(context.Background(), "server-main.serverHandleCmdArgs", fmt.Errorf("[YBS-Start] globalEndpoints: %#v\n", globalEndpoints))
 	logger.FatalIf(err, "Invalid command line arguments")
 	globalNodes = globalEndpoints.GetNodes()
@@ -782,7 +799,6 @@ func serverMain(ctx *cli.Context) {
 	// Handle early server environment vars
 	serverHandleEarlyEnvVars()
 
-	// TODO: 여기서 IDC 정보 가져와서 셋팅하는 구조
 	// Handle all server command args and build the disks layout
 	bootstrapTrace("serverHandleCmdArgs", func() {
 		err := buildServerCtxt(ctx, &globalServerCtxt)
@@ -928,9 +944,8 @@ func serverMain(ctx *cli.Context) {
 		}
 	})
 
-	bootstrapTrace("[YBS] startIDCTopologyMonitor", func() {
-		startIDCTopologyMonitor(GlobalContext)
-	})
+	logger.LogIf(context.Background(), "server-main.serverMain", fmt.Errorf("[YBS-Start] before startIDCTopologyMonitor\n"))
+	startIDCTopologyMonitor(GlobalContext)
 
 	for _, n := range globalNodes {
 		nodeName := n.Host
