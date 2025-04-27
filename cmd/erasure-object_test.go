@@ -36,8 +36,13 @@ import (
 )
 
 func TestRepeatPutObjectPart(t *testing.T) {
+	t.Logf("[YBS] TestRepeatPutObjectPart 호출\n")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// IDC 모니터링 비활성화하고 테스트 완료 후 복원
+	prevState := disableIDCTopologyMonitor()
+	defer enableIDCTopologyMonitor(prevState)
 
 	var objLayer ObjectLayer
 	var disks []string
@@ -49,6 +54,8 @@ func TestRepeatPutObjectPart(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	t.Logf("[YBS] TestRepeatPutObjectPart 호출 후 objLayer, disks, err = prepareErasure16(ctx) 호출\n")
+
 	// cleaning up of temporary test directories
 	defer objLayer.Shutdown(context.Background())
 	defer removeRoots(disks)
@@ -58,21 +65,27 @@ func TestRepeatPutObjectPart(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	t.Logf("[YBS] TestRepeatPutObjectPart 호출 후 err = objLayer.MakeBucket(ctx, \"bucket1\", MakeBucketOptions{}) 호출\n")
 	res, err := objLayer.NewMultipartUpload(ctx, "bucket1", "mpartObj1", opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 	fiveMBBytes := bytes.Repeat([]byte("a"), 5*humanize.MiByte)
 	md5Hex := getMD5Hash(fiveMBBytes)
+
+	t.Logf("[YBS] TestRepeatPutObjectPart 호출 후 _, err = objLayer.PutObjectPart(ctx, \"bucket1\", \"mpartObj1\", res.UploadID, 1, mustGetPutObjReader(t, bytes.NewReader(fiveMBBytes), 5*humanize.MiByte, md5Hex, \"\"), opts) 호출\n")
 	_, err = objLayer.PutObjectPart(ctx, "bucket1", "mpartObj1", res.UploadID, 1, mustGetPutObjReader(t, bytes.NewReader(fiveMBBytes), 5*humanize.MiByte, md5Hex, ""), opts)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	t.Logf("[YBS] TestRepeatPutObjectPart 호출 후 _, err = objLayer.PutObjectPart(ctx, \"bucket1\", \"mpartObj1\", res.UploadID, 1, mustGetPutObjReader(t, bytes.NewReader(fiveMBBytes), 5*humanize.MiByte, md5Hex, \"\"), opts) 호출\n")
 	// PutObjectPart should succeed even if part already exists. ref: https://github.com/minio/minio/issues/1930
 	_, err = objLayer.PutObjectPart(ctx, "bucket1", "mpartObj1", res.UploadID, 1, mustGetPutObjReader(t, bytes.NewReader(fiveMBBytes), 5*humanize.MiByte, md5Hex, ""), opts)
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Logf("[YBS] TestRepeatPutObjectPart 호출 후 _, err = objLayer.PutObjectPart(ctx, \"bucket1\", \"mpartObj1\", res.UploadID, 1, mustGetPutObjReader(t, bytes.NewReader(fiveMBBytes), 5*humanize.MiByte, md5Hex, \"\"), opts) 호출\n")
 }
 
 func TestErasureDeleteObjectBasic(t *testing.T) {

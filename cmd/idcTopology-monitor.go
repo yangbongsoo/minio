@@ -5,12 +5,35 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/minio/minio/internal/logger"
 )
 
 const idcMonitorInterval = 2 * time.Second // 모니터링 주기 2초로 설정
+
+// IDC 모니터링 활성화 여부를 제어하는 플래그
+var idcMonitorEnabled atomic.Bool
+
+// 테스트 환경에서 모니터링 비활성화를 위한 함수
+func disableIDCTopologyMonitor() bool {
+	return idcMonitorEnabled.Swap(false)
+}
+
+// 테스트 후 원래 상태로 모니터링 복원을 위한 함수
+func enableIDCTopologyMonitor(enable bool) {
+	idcMonitorEnabled.Store(enable)
+}
+
+func init() {
+	// 기본값으로 모니터링 활성화 상태로 시작
+	idcMonitorEnabled.Store(true)
+
+	// 기본 토폴로지 파일 경로 설정
+	globalIDCState.TopologyPath = "/tmp/minio/topology/idc-topology.json"
+	globalIDCState.IDCInfoMap = make(map[string]*IDCInfo)
+}
 
 // startIDCTopologyMonitor는 IDC 토폴로지 모니터링 고루틴을 시작.
 func startIDCTopologyMonitor(ctx context.Context) {
@@ -34,6 +57,10 @@ func monitorIDCTopology(ctx context.Context) {
 			logger.LogIf(ctx, "idcTopology-monitor.monitorIDCTopology", fmt.Errorf("[YBS] Stopping IDC topology monitor...\n"))
 			return
 		case <-ticker.C:
+			// 모니터링이 비활성화 상태면 업데이트하지 않음
+			if !idcMonitorEnabled.Load() {
+				continue
+			}
 			updateIDCTopology(ctx, &lastModTime)
 		}
 	}
@@ -41,6 +68,11 @@ func monitorIDCTopology(ctx context.Context) {
 
 // updateIDCTopology는 IDC 토폴로지 파일을 읽고 전역 상태를 업데이트.
 func updateIDCTopology(ctx context.Context, lastModTime *time.Time) {
+	// 모니터링이 비활성화 상태면 업데이트하지 않음
+	if !idcMonitorEnabled.Load() {
+		return
+	}
+
 	filePath := globalIDCState.TopologyPath
 	logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] updateIDCTopology start\n"))
 	// 파일 상태 확인
@@ -122,4 +154,18 @@ func updateIDCTopology(ctx context.Context, lastModTime *time.Time) {
 	globalIDCState.LastCheckTime = UTCNow()   // 마지막 확인 시간 업데이트
 
 	logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] IDC topology state updated successfully.\n"))
+}
+
+// GetActiveIDCCount는 현재 활성 상태인 IDC 수를 반환.
+func GetActiveIDCCount() int {
+	globalIDCState.RLock()
+	defer globalIDCState.RUnlock()
+
+	activeCount := 0
+	for _, idcInfo := range globalIDCState.IDCInfoMap {
+		if idcInfo.IsActive {
+			activeCount++
+		}
+	}
+	return activeCount
 }

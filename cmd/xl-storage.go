@@ -3410,6 +3410,53 @@ func (s *xlStorage) CleanAbandonedData(ctx context.Context, volume string, path 
 	return nil
 }
 
+func (s *xlStorage) getMyIDC() string {
+	podName := ""
+	if s.endpoint.URL != nil {
+		hostname := s.endpoint.URL.Hostname() // ex: myminio-pool-0-7.myminio-hl...
+		parts := strings.Split(hostname, ".")
+		if len(parts) > 0 {
+			podName = parts[0]
+		}
+	}
+
+	if podName == "" {
+		logger.LogIf(context.Background(), "xlStorage.getMyIDC", fmt.Errorf("[YBS] Could not determine pod name for endpoint: %s", s.endpoint.String()))
+		return ""
+	}
+
+	allIDCs := GetAllIDCInfo()
+	for idcName, idcInfo := range allIDCs {
+		for _, idcNodeInfo := range idcInfo.IDCNodeInfos {
+			if idcNodeInfo.Pod == podName {
+				return idcName
+			}
+		}
+	}
+
+	logger.LogIf(context.Background(), "xlStorage.getMyIDC", fmt.Errorf("[YBS] Could not find IDC for pod: %s", podName))
+	return ""
+}
+
+func (s *xlStorage) IsMyIDCActive() bool {
+	idcName := s.getMyIDC()
+	if idcName == "" {
+		logger.LogIf(context.Background(), "xlStorage.IsMyIDCActive", fmt.Errorf("[YBS] Could not determine IDC for endpoint %s, assuming inactive", s.endpoint.String()))
+		return false
+	}
+
+	globalIDCState.RLock()
+	defer globalIDCState.RUnlock()
+
+	idcInfo, ok := globalIDCState.IDCInfoMap[idcName]
+	if !ok {
+		logger.LogIf(context.Background(), "xlStorage.IsMyIDCActive", fmt.Errorf("[YBS] IDC '%s' not found in global state for endpoint %s", idcName, s.endpoint.String()))
+		return false
+	}
+
+	return idcInfo.IsActive
+}
+
 func convertAccessError(err, permErr error) error {
 	switch {
 	case osIsNotExist(err):

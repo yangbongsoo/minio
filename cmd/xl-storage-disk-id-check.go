@@ -924,6 +924,14 @@ func (p *xlStorageDiskIDCheck) TrackDiskHealth(ctx context.Context, s storageMet
 	}, nil
 }
 
+func (s *xlStorageDiskIDCheck) getMyIDC() string {
+	return ""
+}
+
+func (s *xlStorageDiskIDCheck) IsMyIDCActive() bool {
+	return true
+}
+
 var toWrite = []byte{2048: 42}
 
 // monitorDiskStatus should be called once when a drive has been marked offline.

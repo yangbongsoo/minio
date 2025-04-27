@@ -968,6 +968,16 @@ func (client *storageRESTClient) Close() error {
 	return nil
 }
 
+func (client *storageRESTClient) getMyIDC() string {
+	logger.LogIf(context.Background(), "storage-rest-client.go getMyIDC()", fmt.Errorf("[YBS] storage-rest-client.go getMyIDC 호출. return \"\" 하드코딩\n"))
+	return ""
+}
+
+func (client *storageRESTClient) IsMyIDCActive() bool {
+	logger.LogIf(context.Background(), "storage-rest-client.go IsMyIDCActive()", fmt.Errorf("[YBS] storage-rest-client.go IsMyIDCActive 호출. return true 하드코딩\n"))
+	return true
+}
+
 var emptyDiskID = ""
 
 // Returns a storage rest client.

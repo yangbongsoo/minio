@@ -338,3 +338,11 @@ func (d *naughtyDisk) CleanAbandonedData(ctx context.Context, volume string, pat
 	}
 	return d.disk.CleanAbandonedData(ctx, volume, path)
 }
+
+func (d *naughtyDisk) getMyIDC() string {
+	return ""
+}
+
+func (d *naughtyDisk) IsMyIDCActive() bool {
+	return true
+}

@@ -111,4 +111,8 @@ type StorageAPI interface {
 	// Read all.
 	ReadAll(ctx context.Context, volume string, path string) (buf []byte, err error)
 	GetDiskLoc() (poolIdx, setIdx, diskIdx int) // Retrieve location indexes.
+
+	// IDC topology
+	getMyIDC() string
+	IsMyIDCActive() bool
 }
