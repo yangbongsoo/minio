@@ -1,0 +1,104 @@
+{
+    "idc1": [
+      {
+        "node": "test-node-0-0",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-0",
+        "podStatus": "Running"
+      },
+      {
+        "node": "test-node-0-1",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-1",
+        "podStatus": "Running"
+      },
+      {
+        "node": "test-node-0-2",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-2",
+        "podStatus": "Running"
+      },
+      {
+        "node": "test-node-0-3",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-3",
+        "podStatus": "Running"
+      },
+      {
+        "node": "test-node-0-4",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-4",
+        "podStatus": "Running"
+      }
+    ],
+    "idc2": [
+      {
+        "node": "test-node-1-0",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-5",
+        "podStatus": "Running"
+      },
+      {
+        "node": "test-node-1-1",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-6",
+        "podStatus": "Running"
+      },
+      {
+        "node": "test-node-1-2",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-7",
+        "podStatus": "Running"
+      },
+      {
+        "node": "test-node-1-3",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-8",
+        "podStatus": "Running"
+      },
+      {
+        "node": "test-node-1-4",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-9",
+        "podStatus": "Running"
+      }
+    ],
+    "idc3": [
+      {
+        "node": "test-node-2-0",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-10",
+        "podStatus": "Running"
+      },
+      {
+        "node": "test-node-2-1",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-11",
+        "podStatus": "Running"
+      },
+      {
+        "node": "test-node-2-2",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-12",
+        "podStatus": "Running"
+      },
+      {
+        "node": "test-node-2-3",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-13",
+        "podStatus": "Running"
+      },
+      {
+        "node": "test-node-2-4",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-14",
+        "podStatus": "Running"
+      },
+      {
+        "node": "test-node-2-5",
+        "nodeStatus": "Ready",
+        "pod": "test-pod-15",
+        "podStatus": "Running"
+      }
+    ]
+  }

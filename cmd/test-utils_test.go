@@ -2226,7 +2226,19 @@ func mustGetNewEndpoints(poolIdx int, drivesPerSet int, args ...string) (endpoin
 	if err != nil {
 		panic(err)
 	}
+
+	allIDCs := GetAllIDCInfo()
+	podNameList := []string{}
+	for _, idcInfo := range allIDCs {
+		for _, idcNodeInfo := range idcInfo.IDCNodeInfos {
+			podNameList = append(podNameList, idcNodeInfo.Pod)
+		}
+	}
+
 	for i := range endpoints {
+		if endpoints[i].Host == "" {
+			endpoints[i].Host = podNameList[i]
+		}
 		endpoints[i].SetPoolIndex(poolIdx)
 		endpoints[i].SetSetIndex(i / drivesPerSet)
 		endpoints[i].SetDiskIndex(i % drivesPerSet)
