@@ -1153,7 +1153,7 @@ func (er erasureObjects) putMetacacheObject(ctx context.Context, key string, r *
 		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Error: Not enough active disks (%d) for the calculated parity (%d)", len(activeDisks), parityDrives))
 		return ObjectInfo{}, toObjectErr(errErasureWriteQuorum)
 	}
-	dataDrives := len(activeDisks) - parityDrives
+	dataDrives := len(activeDisks) - parityDrives - 1 // EC:7 (4+3)
 	writeQuorum := dataDrives
 	if dataDrives == parityDrives {
 		writeQuorum++
