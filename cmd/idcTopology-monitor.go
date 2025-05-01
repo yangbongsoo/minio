@@ -10,7 +10,7 @@ import (
 	"github.com/minio/minio/internal/logger"
 )
 
-const idcMonitorInterval = 2 * time.Second // 모니터링 주기 2초로 설정
+const idcMonitorInterval = 15 * time.Second // 모니터링 주기 15초로 설정
 
 func init() {
 
@@ -54,25 +54,27 @@ func updateIDCTopologyPath(path string) {
 func updateIDCTopology(ctx context.Context, lastModTime *time.Time) {
 	filePath := globalIDCState.TopologyPath
 	logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] updateIDCTopology start\n"))
+
+	_ = lastModTime
+	// TODO: 테스트를 위해 파일 수정 시간 확인해서 변경있을때만 업데이트 하는 로직 주석 처리
 	// 파일 상태 확인
-	fileInfo, err := os.Stat(filePath)
-	if err != nil {
-		// 파일이 없거나 접근 오류 시 로그 기록 (오류 수준 조정 가능)
-		logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] IDC topology file check error for %s: %w\n", filePath, err))
-		// 파일 접근 불가 시 기존 상태 유지 또는 초기화 결정 필요
-		// 여기서는 기존 상태 유지
-		return
-	}
+	// fileInfo, err := os.Stat(filePath)
+	// if err != nil {
+	// 	// 파일이 없거나 접근 오류 시 로그 기록 (오류 수준 조정 가능)
+	// 	logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] IDC topology file check error for %s: %w\n", filePath, err))
+	// 	// 파일 접근 불가 시 기존 상태 유지 또는 초기화 결정 필요
+	// 	// 여기서는 기존 상태 유지
+	// 	return
+	// }
 
 	// 파일 수정 시간 확인
-	modTime := fileInfo.ModTime()
-	if modTime.Equal(*lastModTime) {
-		logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] IDC topology file not changed\n"))
-		return // 변경 없음
-	}
-	*lastModTime = modTime // 마지막 수정 시간 업데이트
-
-	logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] IDC topology file changed, updating state(modTime: %v)\n", modTime))
+	// modTime := fileInfo.ModTime()
+	// if modTime.Equal(*lastModTime) {
+	// 	logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] IDC topology file not changed\n"))
+	// 	return // 변경 없음
+	// }
+	// *lastModTime = modTime // 마지막 수정 시간 업데이트
+	// logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] IDC topology file changed, updating state(modTime: %v)\n", modTime))
 
 	// 파일 읽기
 	data, err := os.ReadFile(filePath)
