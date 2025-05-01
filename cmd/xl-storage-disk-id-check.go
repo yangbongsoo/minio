@@ -937,7 +937,7 @@ func (p *xlStorageDiskIDCheck) getMyIDC() string {
 	}
 
 	if podName == "" {
-		logger.LogIf(context.Background(), "xlStorage.getMyIDC", fmt.Errorf("[YBS] Could not determine pod name for endpoint: %s", p.storage.endpoint.String()))
+		logger.LogIf(context.Background(), "xlStorageDiskIDCheck.getMyIDC", fmt.Errorf("[YBS] Could not determine pod name for endpoint: %s", p.storage.endpoint.String()))
 		return ""
 	}
 
@@ -950,14 +950,14 @@ func (p *xlStorageDiskIDCheck) getMyIDC() string {
 		}
 	}
 
-	logger.LogIf(context.Background(), "xlStorage.getMyIDC", fmt.Errorf("[YBS] Could not find IDC for pod: %s", podName))
+	logger.LogIf(context.Background(), "xlStorageDiskIDCheck.getMyIDC", fmt.Errorf("[YBS] Could not find IDC for pod: %s", podName))
 	return ""
 }
 
 func (p *xlStorageDiskIDCheck) IsMyIDCActive() bool {
 	idcName := p.getMyIDC()
 	if idcName == "" {
-		logger.LogIf(context.Background(), "xlStorage.IsMyIDCActive", fmt.Errorf("[YBS] Could not determine IDC for endpoint %s, assuming inactive", p.storage.endpoint.String()))
+		logger.LogIf(context.Background(), "xlStorageDiskIDCheck.IsMyIDCActive", fmt.Errorf("[YBS] Could not determine IDC for endpoint %s, assuming inactive", p.storage.endpoint.String()))
 		return false
 	}
 
@@ -966,7 +966,7 @@ func (p *xlStorageDiskIDCheck) IsMyIDCActive() bool {
 
 	idcInfo, ok := globalIDCState.IDCInfoMap[idcName]
 	if !ok {
-		logger.LogIf(context.Background(), "xlStorage.IsMyIDCActive", fmt.Errorf("[YBS] IDC '%s' not found in global state for endpoint %s", idcName, p.storage.endpoint.String()))
+		logger.LogIf(context.Background(), "xlStorageDiskIDCheck.IsMyIDCActive", fmt.Errorf("[YBS] IDC '%s' not found in global state for endpoint %s", idcName, p.storage.endpoint.String()))
 		return false
 	}
 

@@ -969,13 +969,50 @@ func (client *storageRESTClient) Close() error {
 }
 
 func (client *storageRESTClient) getMyIDC() string {
-	logger.LogIf(context.Background(), "storage-rest-client.go getMyIDC()", fmt.Errorf("[YBS] storage-rest-client.go getMyIDC 호출. return \"\" 하드코딩\n"))
+	podName := ""
+	if client.endpoint.URL != nil {
+		hostname := client.endpoint.URL.Hostname() // ex: myminio-pool-0-7.myminio-hl...
+		parts := strings.Split(hostname, ".")
+		if len(parts) > 0 {
+			podName = parts[0]
+		}
+	}
+
+	if podName == "" {
+		logger.LogIf(context.Background(), "storageRESTClient.getMyIDC", fmt.Errorf("[YBS] Could not determine pod name for endpoint: %s", client.endpoint.String()))
+		return ""
+	}
+
+	allIDCs := GetAllIDCInfo()
+	for idcName, idcInfo := range allIDCs {
+		for _, idcNodeInfo := range idcInfo.IDCNodeInfos {
+			if idcNodeInfo.Pod == podName {
+				return idcName
+			}
+		}
+	}
+
+	logger.LogIf(context.Background(), "storageRESTClient.getMyIDC", fmt.Errorf("[YBS] Could not find IDC for pod: %s", podName))
 	return ""
 }
 
 func (client *storageRESTClient) IsMyIDCActive() bool {
-	logger.LogIf(context.Background(), "storage-rest-client.go IsMyIDCActive()", fmt.Errorf("[YBS] storage-rest-client.go IsMyIDCActive 호출. return true 하드코딩\n"))
-	return true
+	idcName := client.getMyIDC()
+	if idcName == "" {
+		logger.LogIf(context.Background(), "storageRESTClient.IsMyIDCActive", fmt.Errorf("[YBS] Could not determine IDC for endpoint %s, assuming inactive", client.endpoint.String()))
+		return false
+	}
+
+	globalIDCState.RLock()
+	defer globalIDCState.RUnlock()
+
+	idcInfo, ok := globalIDCState.IDCInfoMap[idcName]
+	if !ok {
+		logger.LogIf(context.Background(), "storageRESTClient.IsMyIDCActive", fmt.Errorf("[YBS] IDC '%s' not found in global state for endpoint %s", idcName, client.endpoint.String()))
+		return false
+	}
+
+	return idcInfo.IsActive
 }
 
 var emptyDiskID = ""
