@@ -1174,11 +1174,11 @@ func (er erasureObjects) putMetacacheObject(ctx context.Context, key string, r *
 	// 2. 동적 EC 설정 가져오기
 	var currentParity int
 	switch {
-	case activeIDCCount == 3:
+	case activeIDCCount >= 3:
 		currentParity = 5 // EC:12 (7+5)
 		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Applying EC:12 (Parity 5) for %d active IDCs", activeIDCCount))
 	case activeIDCCount == 2:
-		currentParity = 3 // EC:7 (4+3)
+		currentParity = 4 // EC:8 (4+4)
 		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Applying EC:7 (Parity 3) for %d active IDCs", activeIDCCount))
 	default:
 		// 활성 IDC가 1개 이하이면 쓰기 불가능
@@ -1192,7 +1192,7 @@ func (er erasureObjects) putMetacacheObject(ctx context.Context, key string, r *
 		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Error: Not enough active disks (%d) for the calculated parity (%d)", len(activeDisks), parityDrives))
 		return ObjectInfo{}, toObjectErr(errErasureWriteQuorum)
 	}
-	dataDrives := len(activeDisks) - parityDrives - 1 // EC:7 (4+3)
+	dataDrives := len(activeDisks) - parityDrives
 	writeQuorum := dataDrives
 	if dataDrives == parityDrives {
 		writeQuorum++
@@ -1434,8 +1434,8 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 		currentParity = 5 // EC:12 (7+5)
 		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Applying EC:12 (Parity 5) for %d active IDCs", activeIDCCount))
 	case activeIDCCount == 2:
-		currentParity = 3 // EC:7 (4+3)
-		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Applying EC:7 (Parity 3) for %d active IDCs", activeIDCCount))
+		currentParity = 4 // EC:8 (4+4)
+		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Applying EC:8 (Parity 4) for %d active IDCs", activeIDCCount))
 	default:
 		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Error: Not enough active IDCs (%d) to perform write operation. Minimum 2 required", activeIDCCount))
 		// Use a specific error for IDC quorum failure if available, otherwise fallback
