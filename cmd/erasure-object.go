@@ -1527,6 +1527,9 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 
 	// Initialize parts metadata
 	// partsMetadata := make([]FileInfo, len(storageDisks))
+
+	er.updateSetDriveCount(len(activeDisks))
+
 	partsMetadata := make([]FileInfo, len(activeDisks))
 
 	fi := newFileInfo(pathJoin(bucket, object), dataDrives, parityDrives)
