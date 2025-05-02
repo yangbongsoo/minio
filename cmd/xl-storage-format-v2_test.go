@@ -404,6 +404,30 @@ func TestDeleteVersionWithSharedDataDir(t *testing.T) {
 	}
 }
 
+// go test -v ./cmd -run ^TestReadXLMetaV2$
+func TestReadXLMetaV2(t *testing.T) {
+	data, err := os.ReadFile("testdata/xl-ybs-myminio-pool-0-11.meta")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// dec, _ := zstd.NewReader(nil)
+	// data, err = dec.DecodeAll(data, nil)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+
+	var xl xlMetaV2
+	if err = xl.LoadOrConvert(data); err != nil {
+		t.Fatal(err)
+	}
+
+	var version xlMetaV2Version
+	_, err = version.unmarshalV(0, xl.versions[0].meta)
+	jsonBytes, _ := json.MarshalIndent(version, "", "  ")
+	fmt.Println(string(jsonBytes))
+}
+
 func Benchmark_mergeXLV2Versions(b *testing.B) {
 	data, err := os.ReadFile("testdata/xl.meta-v1.2.zst")
 	if err != nil {

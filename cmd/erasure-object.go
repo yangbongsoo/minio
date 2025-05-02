@@ -703,6 +703,36 @@ func readAllXL(ctx context.Context, disks []StorageAPI, bucket, object string, r
 }
 
 func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object string, opts ObjectOptions, readData bool) (FileInfo, []FileInfo, []StorageAPI, error) {
+	disks := er.getDisks()
+	// 1. 활성 IDC 디스크 필터링
+	activeDisks := make([]StorageAPI, 0, len(disks))
+	activeIDCMap := make(map[string]bool)
+	for _, disk := range disks {
+		if disk == nil {
+			continue
+		}
+		storageInstance, ok := disk.(StorageAPI)
+		if !ok {
+			logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Disk is not of type StorageAPI: %T", disk))
+			continue
+		}
+
+		if storageInstance.IsMyIDCActive() && storageInstance.IsOnline() {
+			activeDisks = append(activeDisks, disk)
+			idcName := storageInstance.getMyIDC()
+			if idcName != "" {
+				activeIDCMap[idcName] = true
+			}
+		} else {
+			logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Skipping inactive/offline disk: %s (IDC: %s, IDC Active: %t, Online: %t)",
+				disk.String(), storageInstance.getMyIDC(), storageInstance.IsMyIDCActive(), storageInstance.IsOnline()))
+		}
+	}
+
+	er.updateSetDriveCount(len(activeDisks))
+	/////////////
+	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] er.setDriveCount: %d", er.setDriveCount))
+
 	rawArr := make([]RawFileInfo, er.setDriveCount)
 	metaArr := make([]FileInfo, er.setDriveCount)
 	errs := make([]error, er.setDriveCount)
@@ -711,7 +741,6 @@ func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object s
 	}
 
 	done := make(chan bool, er.setDriveCount)
-	disks := er.getDisks()
 
 	ropts := ReadOptions{
 		ReadData:         readData,
@@ -732,6 +761,11 @@ func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object s
 		wg := sync.WaitGroup{}
 		for i, disk := range disks {
 			if disk == nil {
+				done <- false
+				continue
+			}
+			idcName := disk.getMyIDC()
+			if !activeIDCMap[idcName] {
 				done <- false
 				continue
 			}
@@ -823,10 +857,15 @@ func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object s
 	// not know the storage class of the object yet
 	minDisks := 0
 	if p := globalStorageClass.GetParityForSC(""); p > -1 {
+		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] er.setDriveCount: %d", er.setDriveCount))
+		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] p: %d", p))
 		minDisks = er.setDriveCount - p
 	} else {
+		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] er.setDriveCount: %d", er.setDriveCount))
+		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] er.defaultParityCount: %d", er.defaultParityCount))
 		minDisks = er.setDriveCount - er.defaultParityCount
 	}
+	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] minDisks: %d", minDisks))
 
 	calcQuorum := func(metaArr []FileInfo, errs []error) (FileInfo, []FileInfo, []StorageAPI, time.Time, string, error) {
 		readQuorum, _, err := objectQuorumFromMeta(ctx, metaArr, errs, er.defaultParityCount)
