@@ -705,31 +705,30 @@ func readAllXL(ctx context.Context, disks []StorageAPI, bucket, object string, r
 func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object string, opts ObjectOptions, readData bool) (FileInfo, []FileInfo, []StorageAPI, error) {
 	disks := er.getDisks()
 	// 1. 활성 IDC 디스크 필터링
-	activeDisks := make([]StorageAPI, 0, len(disks))
-	activeIDCMap := make(map[string]bool)
-	for _, disk := range disks {
-		if disk == nil {
-			continue
-		}
-		storageInstance, ok := disk.(StorageAPI)
-		if !ok {
-			logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Disk is not of type StorageAPI: %T", disk))
-			continue
-		}
+	// activeDisks := make([]StorageAPI, 0, len(disks))
+	// activeIDCMap := make(map[string]bool)
+	// for _, disk := range disks {
+	// 	if disk == nil {
+	// 		continue
+	// 	}
+	// 	storageInstance, ok := disk.(StorageAPI)
+	// 	if !ok {
+	// 		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Disk is not of type StorageAPI: %T", disk))
+	// 		continue
+	// 	}
 
-		if storageInstance.IsMyIDCActive() && storageInstance.IsOnline() {
-			activeDisks = append(activeDisks, disk)
-			idcName := storageInstance.getMyIDC()
-			if idcName != "" {
-				activeIDCMap[idcName] = true
-			}
-		} else {
-			logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Skipping inactive/offline disk: %s (IDC: %s, IDC Active: %t, Online: %t)",
-				disk.String(), storageInstance.getMyIDC(), storageInstance.IsMyIDCActive(), storageInstance.IsOnline()))
-		}
-	}
-
-	er.updateSetDriveCount(len(activeDisks))
+	// 	if storageInstance.IsMyIDCActive() && storageInstance.IsOnline() {
+	// 		activeDisks = append(activeDisks, disk)
+	// 		idcName := storageInstance.getMyIDC()
+	// 		if idcName != "" {
+	// 			activeIDCMap[idcName] = true
+	// 		}
+	// 	} else {
+	// 		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Skipping inactive/offline disk: %s (IDC: %s, IDC Active: %t, Online: %t)",
+	// 			disk.String(), storageInstance.getMyIDC(), storageInstance.IsMyIDCActive(), storageInstance.IsOnline()))
+	// 	}
+	// }
+	// er.updateSetDriveCount(len(activeDisks))
 	/////////////
 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] er.setDriveCount: %d", er.setDriveCount))
 
@@ -764,11 +763,11 @@ func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object s
 				done <- false
 				continue
 			}
-			idcName := disk.getMyIDC()
-			if !activeIDCMap[idcName] {
-				done <- false
-				continue
-			}
+			// idcName := disk.getMyIDC()
+			// if !activeIDCMap[idcName] {
+			// 	done <- false
+			// 	continue
+			// }
 			if !disk.IsOnline() {
 				done <- false
 				continue
