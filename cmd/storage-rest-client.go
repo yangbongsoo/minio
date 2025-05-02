@@ -983,9 +983,12 @@ func (client *storageRESTClient) getMyIDC() string {
 		return ""
 	}
 
+	logger.LogIf(context.Background(), "storageRESTClient.getMyIDC", fmt.Errorf("[YBS] podName: %s", podName))
+
 	allIDCs := GetAllIDCInfo()
 	for idcName, idcInfo := range allIDCs {
 		for _, idcNodeInfo := range idcInfo.IDCNodeInfos {
+			logger.LogIf(context.Background(), "storageRESTClient.getMyIDC", fmt.Errorf("[YBS] idcNodeInfo.Pod: %v", idcNodeInfo.Pod))
 			if idcNodeInfo.Pod == podName {
 				return idcName
 			}
