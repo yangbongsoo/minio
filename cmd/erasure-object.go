@@ -707,6 +707,12 @@ func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object s
 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo len(disks): %d", len(disks)))
 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.setDriveCount: %d", er.setDriveCount))
 	//////
+
+	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("getObjectFileInfo.globalIDCState.IDCInfoMap"))
+	for idcName, idcInfo := range globalIDCState.IDCInfoMap {
+		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[IDCInfo] IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
+	}
+
 	// 1. 온라인 디스크/IDC 필터링
 	activeDisks := make([]StorageAPI, 0, len(disks))
 	activeIDCMap := make(map[string]bool)
@@ -1451,6 +1457,11 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 			"erasure-object.PutObject",
 			fmt.Errorf("[YBS] 디스크[%d]: %s, 온라인 상태: %v, 로컬 상태: %v\n", i, diskInfo, isOnline, isLocal),
 		)
+	}
+
+	logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("putObject.globalIDCState.IDCInfoMap"))
+	for idcName, idcInfo := range globalIDCState.IDCInfoMap {
+		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[IDCInfo] IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
 	}
 
 	// 1. 활성 IDC 디스크 필터링
