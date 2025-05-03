@@ -762,6 +762,11 @@ func initializeLogRotate(ctx *cli.Context) (io.WriteCloser, error) {
 
 // serverMain handler called for 'minio server' command.
 func serverMain(ctx *cli.Context) {
+	logger.LogIf(context.Background(), "server-main.serverMain", fmt.Errorf("[YBS-Start] before startIDCTopologyMonitor\n"))
+	startIDCTopologyMonitor(GlobalContext)
+
+	time.Sleep(15 * time.Second)
+
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	var warnings []string
@@ -943,9 +948,6 @@ func serverMain(ctx *cli.Context) {
 			logFatalErrs(err, Endpoint{}, true)
 		}
 	})
-
-	logger.LogIf(context.Background(), "server-main.serverMain", fmt.Errorf("[YBS-Start] before startIDCTopologyMonitor\n"))
-	startIDCTopologyMonitor(GlobalContext)
 
 	for _, n := range globalNodes {
 		nodeName := n.Host
