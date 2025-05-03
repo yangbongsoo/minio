@@ -494,24 +494,25 @@ func GetIDCInfo(idcName string) (*IDCInfo, bool) {
 	if !ok {
 		return nil, false
 	}
-	// 방어적 복사본 반환 (포인터지만 내부 슬라이스는 복사되지 않음)
-	// 필요하다면 더 깊은 복사 고려
+	// 깊은 복사본 반환 (구조체와 IDCNodeInfos 슬라이스 모두 복사)
 	idcCopy := *info
+	nodesCopy := make([]IDCNodeInfo, len(info.IDCNodeInfos))
+	copy(nodesCopy, info.IDCNodeInfos)
+	idcCopy.IDCNodeInfos = nodesCopy
 	return &idcCopy, true
 }
 
-func GetAllIDCInfo() map[string]*IDCInfo {
+// GetAllIDCInfo는 IDCInfo와 IDCNodeInfos 모두 깊은 복사하여 반환한다.
+func GetAllIDCInfo() map[string]IDCInfo {
 	globalIDCState.RLock()
 	defer globalIDCState.RUnlock()
-	// 방어적 복사본 생성
-	idcInfoMapCopy := make(map[string]*IDCInfo)
+	idcInfoMapCopy := make(map[string]IDCInfo)
 	for name, idcInfo := range globalIDCState.IDCInfoMap {
-		idcInfoCopy := *idcInfo // IDCInfo 구조체 복사
-		// 필요시 Nodes 슬라이스도 깊은 복사
-		// nodesCopy := make([]IDCNodeInfo, len(info.Nodes))
-		// copy(nodesCopy, info.Nodes)
-		// infoCopy.Nodes = nodesCopy
-		idcInfoMapCopy[name] = &idcInfoCopy
+		idcInfoCopy := *idcInfo // IDCInfo 구조체 값 복사
+		nodesCopy := make([]IDCNodeInfo, len(idcInfo.IDCNodeInfos))
+		copy(nodesCopy, idcInfo.IDCNodeInfos)
+		idcInfoCopy.IDCNodeInfos = nodesCopy
+		idcInfoMapCopy[name] = idcInfoCopy
 	}
 	return idcInfoMapCopy
 }

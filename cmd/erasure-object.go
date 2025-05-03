@@ -708,8 +708,8 @@ func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object s
 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.setDriveCount: %d", er.setDriveCount))
 	//////
 
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("getObjectFileInfo.globalIDCState.IDCInfoMap"))
-	for idcName, idcInfo := range globalIDCState.IDCInfoMap {
+	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("getObjectFileInfo.GetAllIDCInfo()"))
+	for idcName, idcInfo := range GetAllIDCInfo() {
 		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[IDCInfo] IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
 	}
 
@@ -1459,8 +1459,8 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 		)
 	}
 
-	logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("putObject.globalIDCState.IDCInfoMap"))
-	for idcName, idcInfo := range globalIDCState.IDCInfoMap {
+	logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("putObject.GetAllIDCInfo()"))
+	for idcName, idcInfo := range GetAllIDCInfo() {
 		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[IDCInfo] IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
 	}
 

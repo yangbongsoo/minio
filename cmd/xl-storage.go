@@ -3448,10 +3448,7 @@ func (s *xlStorage) IsMyIDCActive() (bool, string) {
 		return false, ""
 	}
 
-	globalIDCState.RLock()
-	defer globalIDCState.RUnlock()
-
-	idcInfo, ok := globalIDCState.IDCInfoMap[idcName]
+	idcInfo, ok := GetIDCInfo(idcName)
 	if !ok {
 		logger.LogIf(context.Background(), "xlStorage.IsMyIDCActive", fmt.Errorf("[YBS] IDC '%s' not found in global state for endpoint %s", idcName, s.endpoint.String()))
 		return false, ""

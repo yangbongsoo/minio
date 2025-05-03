@@ -136,17 +136,3 @@ func updateIDCTopology(ctx context.Context, lastModTime *time.Time) {
 
 	logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] IDC topology state updated successfully.\n"))
 }
-
-// GetActiveIDCCount는 현재 활성 상태인 IDC 수를 반환.
-func GetActiveIDCCount() int {
-	globalIDCState.RLock()
-	defer globalIDCState.RUnlock()
-
-	activeCount := 0
-	for _, idcInfo := range globalIDCState.IDCInfoMap {
-		if idcInfo.IsActive {
-			activeCount++
-		}
-	}
-	return activeCount
-}

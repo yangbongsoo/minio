@@ -1006,10 +1006,7 @@ func (client *storageRESTClient) IsMyIDCActive() (bool, string) {
 		return false, ""
 	}
 
-	globalIDCState.RLock()
-	defer globalIDCState.RUnlock()
-
-	idcInfo, ok := globalIDCState.IDCInfoMap[idcName]
+	idcInfo, ok := GetIDCInfo(idcName)
 	if !ok {
 		logger.LogIf(context.Background(), "storageRESTClient.IsMyIDCActive", fmt.Errorf("[YBS] IDC '%s' not found in global state for endpoint %s", idcName, client.endpoint.String()))
 		return false, ""
