@@ -704,7 +704,9 @@ func readAllXL(ctx context.Context, disks []StorageAPI, bucket, object string, r
 
 func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object string, opts ObjectOptions, readData bool) (FileInfo, []FileInfo, []StorageAPI, error) {
 	disks := er.getDisks()
-	// 1. 활성 IDC 디스크 필터링
+	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo len(disks): %d", len(disks)))
+	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.setDriveCount: %d", er.setDriveCount))
+
 	// activeDisks := make([]StorageAPI, 0, len(disks))
 	// activeIDCMap := make(map[string]bool)
 	// for _, disk := range disks {
@@ -730,7 +732,6 @@ func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object s
 	// }
 	// er.updateSetDriveCount(len(activeDisks))
 	/////////////
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] er.setDriveCount: %d", er.setDriveCount))
 
 	rawArr := make([]RawFileInfo, er.setDriveCount)
 	metaArr := make([]FileInfo, er.setDriveCount)
@@ -1156,15 +1157,15 @@ func (er erasureObjects) putMetacacheObject(ctx context.Context, key string, r *
 			continue // 혹은 오류 처리
 		}
 
-		if storageInstance.IsMyIDCActive() && storageInstance.IsOnline() {
+		isMyIDCActive, idcName := storageInstance.IsMyIDCActive()
+		if isMyIDCActive && storageInstance.IsOnline() {
 			activeDisks = append(activeDisks, disk)
-			idcName := storageInstance.getMyIDC()
 			if idcName != "" {
 				activeIDCMap[idcName] = true
 			}
 		} else {
 			logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Skipping inactive/offline disk: %s (IDC: %s, IDC Active: %t, Online: %t)",
-				disk.String(), storageInstance.getMyIDC(), storageInstance.IsMyIDCActive(), storageInstance.IsOnline()))
+				disk.String(), idcName, isMyIDCActive, storageInstance.IsOnline()))
 		}
 	}
 	activeIDCCount := len(activeIDCMap)
@@ -1412,15 +1413,15 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 			continue
 		}
 
-		if storageInstance.IsMyIDCActive() && storageInstance.IsOnline() {
+		isMyIDCActive, idcName := storageInstance.IsMyIDCActive()
+		if isMyIDCActive && storageInstance.IsOnline() {
 			activeDisks = append(activeDisks, disk)
-			idcName := storageInstance.getMyIDC()
 			if idcName != "" {
 				activeIDCMap[idcName] = true
 			}
 		} else {
 			logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Skipping inactive/offline disk: %s (IDC: %s, IDC Active: %t, Online: %t)",
-				disk.String(), storageInstance.getMyIDC(), storageInstance.IsMyIDCActive(), storageInstance.IsOnline()))
+				disk.String(), idcName, isMyIDCActive, storageInstance.IsOnline()))
 		}
 	}
 	activeIDCCount := len(activeIDCMap)
@@ -1467,7 +1468,7 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 	//	 parityDrives = er.defaultParityCount
 	// }
 	//logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives step2: %d\n", parityDrives))
-	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] false 강제전, opts.MaxParity: %v\n", opts.MaxParity))
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] false 강제전, opts.MaxParity: %v", opts.MaxParity))
 	opts.MaxParity = false
 	// if opts.MaxParity {
 	// 	parityDrives = len(storageDisks) / 2
@@ -1514,9 +1515,9 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 	// 	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives step4: %d\n", parityDrives))
 	// }
 	// dataDrives := len(storageDisks) - parityDrives
-	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] dataDrives: %d\n", dataDrives))
-	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] len(storageDisks): %d\n", len(storageDisks)))
-	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives: %d\n", parityDrives))
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] dataDrives: %d", dataDrives))
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] len(storageDisks): %d", len(storageDisks)))
+	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives: %d", parityDrives))
 	// we now know the number of blocks this object needs for data and parity.
 	// writeQuorum is dataBlocks + 1
 	// writeQuorum := dataDrives

@@ -957,11 +957,11 @@ func (p *xlStorageDiskIDCheck) getMyIDC() string {
 	return ""
 }
 
-func (p *xlStorageDiskIDCheck) IsMyIDCActive() bool {
+func (p *xlStorageDiskIDCheck) IsMyIDCActive() (bool, string) {
 	idcName := p.getMyIDC()
 	if idcName == "" {
 		logger.LogIf(context.Background(), "xlStorageDiskIDCheck.IsMyIDCActive", fmt.Errorf("[YBS] Could not determine IDC for endpoint %s, assuming inactive", p.storage.endpoint.String()))
-		return false
+		return false, ""
 	}
 
 	globalIDCState.RLock()
@@ -970,10 +970,10 @@ func (p *xlStorageDiskIDCheck) IsMyIDCActive() bool {
 	idcInfo, ok := globalIDCState.IDCInfoMap[idcName]
 	if !ok {
 		logger.LogIf(context.Background(), "xlStorageDiskIDCheck.IsMyIDCActive", fmt.Errorf("[YBS] IDC '%s' not found in global state for endpoint %s", idcName, p.storage.endpoint.String()))
-		return false
+		return false, ""
 	}
 
-	return idcInfo.IsActive
+	return idcInfo.IsActive, idcName
 }
 
 ///////

@@ -406,7 +406,7 @@ func TestDeleteVersionWithSharedDataDir(t *testing.T) {
 
 // go test -v ./cmd -run ^TestReadXLMetaV2$
 func TestReadXLMetaV2(t *testing.T) {
-	data, err := os.ReadFile("testdata/xl-ybs-myminio-pool-0-11.meta")
+	data, err := os.ReadFile("testdata/xl-ybs-myminio-pool-0-7-1.meta")
 	if err != nil {
 		t.Fatal(err)
 	}

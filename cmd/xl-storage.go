@@ -3441,11 +3441,11 @@ func (s *xlStorage) getMyIDC() string {
 	return ""
 }
 
-func (s *xlStorage) IsMyIDCActive() bool {
+func (s *xlStorage) IsMyIDCActive() (bool, string) {
 	idcName := s.getMyIDC()
 	if idcName == "" {
 		logger.LogIf(context.Background(), "xlStorage.IsMyIDCActive", fmt.Errorf("[YBS] Could not determine IDC for endpoint %s, assuming inactive", s.endpoint.String()))
-		return false
+		return false, ""
 	}
 
 	globalIDCState.RLock()
@@ -3454,10 +3454,10 @@ func (s *xlStorage) IsMyIDCActive() bool {
 	idcInfo, ok := globalIDCState.IDCInfoMap[idcName]
 	if !ok {
 		logger.LogIf(context.Background(), "xlStorage.IsMyIDCActive", fmt.Errorf("[YBS] IDC '%s' not found in global state for endpoint %s", idcName, s.endpoint.String()))
-		return false
+		return false, ""
 	}
 
-	return idcInfo.IsActive
+	return idcInfo.IsActive, idcName
 }
 
 func convertAccessError(err, permErr error) error {

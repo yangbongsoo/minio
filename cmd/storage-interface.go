@@ -113,6 +113,5 @@ type StorageAPI interface {
 	GetDiskLoc() (poolIdx, setIdx, diskIdx int) // Retrieve location indexes.
 
 	// IDC topology
-	getMyIDC() string
-	IsMyIDCActive() bool
+	IsMyIDCActive() (bool, string)
 }

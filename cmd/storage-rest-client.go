@@ -999,11 +999,11 @@ func (client *storageRESTClient) getMyIDC() string {
 	return ""
 }
 
-func (client *storageRESTClient) IsMyIDCActive() bool {
+func (client *storageRESTClient) IsMyIDCActive() (bool, string) {
 	idcName := client.getMyIDC()
 	if idcName == "" {
 		logger.LogIf(context.Background(), "storageRESTClient.IsMyIDCActive", fmt.Errorf("[YBS] Could not determine IDC for endpoint %s, assuming inactive", client.endpoint.String()))
-		return false
+		return false, ""
 	}
 
 	globalIDCState.RLock()
@@ -1012,10 +1012,10 @@ func (client *storageRESTClient) IsMyIDCActive() bool {
 	idcInfo, ok := globalIDCState.IDCInfoMap[idcName]
 	if !ok {
 		logger.LogIf(context.Background(), "storageRESTClient.IsMyIDCActive", fmt.Errorf("[YBS] IDC '%s' not found in global state for endpoint %s", idcName, client.endpoint.String()))
-		return false
+		return false, ""
 	}
 
-	return idcInfo.IsActive
+	return idcInfo.IsActive, idcName
 }
 
 var emptyDiskID = ""
