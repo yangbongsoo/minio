@@ -702,8 +702,49 @@ func readAllXL(ctx context.Context, disks []StorageAPI, bucket, object string, r
 	return pickLatestQuorumFilesInfo(ctx, rawFileInfos, errs, bucket, object, readData, inclFreeVers)
 }
 
+func waitForAllDisks(er erasureObjects, expected int, maxWait time.Duration) []StorageAPI {
+	var disks []StorageAPI
+	deadline := time.Now().Add(maxWait)
+	for {
+		disks = er.getDisks()
+		ready := true
+		if len(disks) < expected {
+			ready = false
+		} else {
+			for _, d := range disks {
+				if d == nil {
+					ready = false
+					break
+				}
+
+				if !d.IsOnline() {
+					ready = false
+					break
+				}
+
+				if d.Endpoint().URL.Host == "" {
+					ready = false
+					break
+				}
+			}
+		}
+		if ready {
+			logger.LogIf(context.Background(), "waitForAllDisks", fmt.Errorf("waitForAllDisks.ready"))
+			break
+		}
+		if time.Now().After(deadline) {
+			// 일정 시간 이상 대기했는데도 준비 안되면 panic/log 등
+			logger.LogIf(context.Background(), "waitForAllDisks", fmt.Errorf("Timed out waiting for all disks to be ready"))
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	return disks
+}
+
 func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object string, opts ObjectOptions, readData bool) (FileInfo, []FileInfo, []StorageAPI, error) {
-	disks := er.getDisks()
+	// disks := er.getDisks()
+	disks := waitForAllDisks(er, 12, 30*time.Second) // work around test
 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo len(disks): %d", len(disks)))
 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.setDriveCount: %d", er.setDriveCount))
 	//////
@@ -1201,7 +1242,8 @@ func (er erasureObjects) putMetacacheObject(ctx context.Context, key string, r *
 		opts.UserDefined = make(map[string]string)
 	}
 
-	storageDisks := er.getDisks()
+	storageDisks := waitForAllDisks(er, 12, 30*time.Second) // work around test
+	// storageDisks := er.getDisks()
 
 	// 1. 활성 IDC 디스크 필터링
 	activeDisks := make([]StorageAPI, 0, len(storageDisks))
@@ -1441,7 +1483,8 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 
 	userDefined := cloneMSS(opts.UserDefined)
 
-	storageDisks := er.getDisks()
+	storageDisks := waitForAllDisks(er, 12, 30*time.Second) // work around test
+	// storageDisks := er.getDisks()
 	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] storageDisks 갯수 : %d\n", len(storageDisks)))
 	for i, disk := range storageDisks {
 		if disk == nil {
