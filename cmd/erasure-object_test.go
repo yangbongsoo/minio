@@ -42,6 +42,7 @@ func setUpIDCTopology() {
 	var lastModTime time.Time
 	updateIDCTopologyPath(testdataPath)
 	updateIDCTopology(context.Background(), &lastModTime)
+	// startIDCTopologyMonitor(context.Background())
 }
 
 func TestRepeatPutObjectPart(t *testing.T) {

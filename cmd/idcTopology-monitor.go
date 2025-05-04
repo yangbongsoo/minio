@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -20,9 +21,38 @@ func init() {
 }
 
 // startIDCTopologyMonitor는 IDC 토폴로지 모니터링 고루틴을 시작.
-func startIDCTopologyMonitor(ctx context.Context) {
+func startIDCTopologyMonitor(ctx context.Context) error {
 	logger.LogIf(ctx, "idcTopology-monitor.startIDCTopologyMonitor", fmt.Errorf("[YBS] Starting IDC topology monitor...\n"))
+	// 초기 실행: 서버 시작 시 즉시 상태 로드 시도
+	idcInfoMap := updateIDCTopology(ctx, nil)
+	if idcInfoMap == nil {
+		return errors.New("failed to update IDC topology")
+	}
+
+	// idcInfoMap 에 모든 IDC 정보가 다 채워졌는지 계속 확인
+	for {
+		initTotalNodeCount := 0
+		for idcName, idcInfo := range idcInfoMap {
+			if idcInfo.IDCNodeInfos == nil {
+				logger.LogIf(ctx, "idcTopology-monitor.startIDCTopologyMonitor", fmt.Errorf("[YBS] idcName: %s, idcInfo.IDCNodeInfos == nil", idcName))
+				time.Sleep(3 * time.Second)
+			} else {
+				logger.LogIf(ctx, "idcTopology-monitor.startIDCTopologyMonitor", fmt.Errorf("[YBS] idcName: %s, idcInfo.IDCNodeInfos != nil", idcName))
+				logger.LogIf(ctx, "idcTopology-monitor.startIDCTopologyMonitor", fmt.Errorf("[YBS] idcName: %s, idcInfo.TotalNodeCount: %d", idcName, idcInfo.TotalNodeCount))
+				logger.LogIf(ctx, "idcTopology-monitor.startIDCTopologyMonitor", fmt.Errorf("[YBS] idcName: %s, idcInfo.IsActive: %v", idcName, idcInfo.IsActive))
+
+				initTotalNodeCount += idcInfo.TotalNodeCount
+			}
+		}
+		if initTotalNodeCount >= 12 {
+			logger.LogIf(ctx, "idcTopology-monitor.startIDCTopologyMonitor", fmt.Errorf("[YBS] initTotalNodeCount: %d", initTotalNodeCount))
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+
 	go monitorIDCTopology(ctx)
+	return nil
 }
 
 // monitorIDCTopology는 주기적으로 IDC 토폴로지 파일을 확인하고 전역 상태를 업데이트.
@@ -31,9 +61,6 @@ func monitorIDCTopology(ctx context.Context) {
 
 	ticker := time.NewTicker(idcMonitorInterval)
 	defer ticker.Stop()
-
-	// 초기 실행: 서버 시작 시 즉시 상태 로드 시도
-	updateIDCTopology(ctx, &lastModTime)
 
 	for {
 		select {
@@ -51,7 +78,7 @@ func updateIDCTopologyPath(path string) {
 }
 
 // updateIDCTopology는 IDC 토폴로지 파일을 읽고 전역 상태를 업데이트.
-func updateIDCTopology(ctx context.Context, lastModTime *time.Time) {
+func updateIDCTopology(ctx context.Context, lastModTime *time.Time) map[string]*IDCInfo {
 	filePath := globalIDCState.TopologyPath
 	logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] updateIDCTopology start\n"))
 
@@ -80,7 +107,7 @@ func updateIDCTopology(ctx context.Context, lastModTime *time.Time) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] IDC topology file read error for %s: %w\n", filePath, err))
-		return
+		return nil
 	}
 
 	logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] IDC topology file read successfully\n"))
@@ -89,7 +116,7 @@ func updateIDCTopology(ctx context.Context, lastModTime *time.Time) {
 	var idcNodeInfoMap map[string][]IDCNodeInfo
 	if err := json.Unmarshal(data, &idcNodeInfoMap); err != nil {
 		logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] IDC topology JSON parse error for %s: %w\n", filePath, err))
-		return
+		return nil
 	}
 
 	logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] Raw Topology Data: %#v", idcNodeInfoMap))
@@ -135,4 +162,5 @@ func updateIDCTopology(ctx context.Context, lastModTime *time.Time) {
 	globalIDCState.LastCheckTime = UTCNow()   // 마지막 확인 시간 업데이트
 
 	logger.LogIf(ctx, "idcTopology-monitor.updateIDCTopology", fmt.Errorf("[YBS] IDC topology state updated successfully.\n"))
+	return globalIDCState.IDCInfoMap
 }
