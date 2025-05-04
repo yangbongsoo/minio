@@ -222,7 +222,6 @@ func (client *storageRESTClient) LastConn() time.Time {
 }
 
 func (client *storageRESTClient) IsLocal() bool {
-	logger.LogIf(context.Background(), "storage-rest-client.go IsLocal()", fmt.Errorf("[YBS] IsLocal 호출. return false 하드코딩\n"))
 	return false
 }
 
