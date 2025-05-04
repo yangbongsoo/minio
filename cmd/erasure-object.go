@@ -744,65 +744,65 @@ func waitForAllDisks(er erasureObjects, expected int, maxWait time.Duration) []S
 
 func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object string, opts ObjectOptions, readData bool) (FileInfo, []FileInfo, []StorageAPI, error) {
 	// disks := er.getDisks()
-	disks := waitForAllDisks(er, 12, 30*time.Second) // work around test
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo len(disks): %d", len(disks)))
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.setDriveCount: %d", er.setDriveCount))
-	//////
+	// disks := waitForAllDisks(er, 12, 30*time.Second) // work around test
+	// logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo len(disks): %d", len(disks)))
+	// logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.setDriveCount: %d", er.setDriveCount))
+	// //////
 
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("getObjectFileInfo.GetAllIDCInfo()"))
-	for idcName, idcInfo := range GetAllIDCInfo() {
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[IDCInfo] IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
-	}
+	// logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("getObjectFileInfo.GetAllIDCInfo()"))
+	// for idcName, idcInfo := range GetAllIDCInfo() {
+	// 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[IDCInfo] IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
+	// }
 
-	// 1. 온라인 디스크/IDC 필터링
-	activeDisks := make([]StorageAPI, 0, len(disks))
-	activeIDCMap := make(map[string]bool)
-	for _, disk := range disks {
-		if disk == nil {
-			continue
-		}
-		storageInstance, ok := disk.(StorageAPI)
-		if !ok {
-			logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Disk is not of type StorageAPI: %T", disk))
-			continue
-		}
-		isMyIDCActive, idcName := storageInstance.IsMyIDCActive()
-		if isMyIDCActive && storageInstance.IsOnline() {
-			activeDisks = append(activeDisks, disk)
-			if idcName != "" {
-				activeIDCMap[idcName] = true
-			}
-		} else {
-			logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Skipping inactive/offline disk: %s (IDC: %s, IDC Active: %t, Online: %t)",
-				disk.String(), idcName, isMyIDCActive, storageInstance.IsOnline()))
-		}
-	}
-	activeIDCCount := len(activeIDCMap)
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Total disks: %d, Active disks: %d from %d active IDCs", len(disks), len(activeDisks), activeIDCCount))
+	// // 1. 온라인 디스크/IDC 필터링
+	// activeDisks := make([]StorageAPI, 0, len(disks))
+	// activeIDCMap := make(map[string]bool)
+	// for _, disk := range disks {
+	// 	if disk == nil {
+	// 		continue
+	// 	}
+	// 	storageInstance, ok := disk.(StorageAPI)
+	// 	if !ok {
+	// 		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Disk is not of type StorageAPI: %T", disk))
+	// 		continue
+	// 	}
+	// 	isMyIDCActive, idcName := storageInstance.IsMyIDCActive()
+	// 	if isMyIDCActive && storageInstance.IsOnline() {
+	// 		activeDisks = append(activeDisks, disk)
+	// 		if idcName != "" {
+	// 			activeIDCMap[idcName] = true
+	// 		}
+	// 	} else {
+	// 		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Skipping inactive/offline disk: %s (IDC: %s, IDC Active: %t, Online: %t)",
+	// 			disk.String(), idcName, isMyIDCActive, storageInstance.IsOnline()))
+	// 	}
+	// }
+	// activeIDCCount := len(activeIDCMap)
+	// logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Total disks: %d, Active disks: %d from %d active IDCs", len(disks), len(activeDisks), activeIDCCount))
 
-	// 2. 동적 EC 파라미터 결정
-	var dataBlocks, parityBlocks int
-	switch {
-	case activeIDCCount >= 3:
-		parityBlocks = 5 // EC:12 (7+5)
-		dataBlocks = len(activeDisks) - parityBlocks
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Applying EC:12 (Parity 5) for %d active IDCs", activeIDCCount))
-	case activeIDCCount == 2:
-		parityBlocks = 4 // EC:8 (4+4)
-		dataBlocks = len(activeDisks) - parityBlocks
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Applying EC:8 (Parity 4) for %d active IDCs", activeIDCCount))
-	default:
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Error: Not enough active IDCs (%d) to perform read operation. Minimum 2 required", activeIDCCount))
-		return FileInfo{}, nil, nil, toObjectErr(errErasureReadQuorum, bucket, object)
-	}
+	// // 2. 동적 EC 파라미터 결정
+	// var dataBlocks, parityBlocks int
+	// switch {
+	// case activeIDCCount >= 3:
+	// 	parityBlocks = 5 // EC:12 (7+5)
+	// 	dataBlocks = len(activeDisks) - parityBlocks
+	// 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Applying EC:12 (Parity 5) for %d active IDCs", activeIDCCount))
+	// case activeIDCCount == 2:
+	// 	parityBlocks = 4 // EC:8 (4+4)
+	// 	dataBlocks = len(activeDisks) - parityBlocks
+	// 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Applying EC:8 (Parity 4) for %d active IDCs", activeIDCCount))
+	// default:
+	// 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Error: Not enough active IDCs (%d) to perform read operation. Minimum 2 required", activeIDCCount))
+	// 	return FileInfo{}, nil, nil, toObjectErr(errErasureReadQuorum, bucket, object)
+	// }
 
-	if dataBlocks <= 0 || len(activeDisks) < dataBlocks {
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Error: Not enough active disks (%d) for the calculated dataBlocks (%d)", len(activeDisks), dataBlocks))
-		return FileInfo{}, nil, nil, toObjectErr(errErasureReadQuorum, bucket, object)
-	}
-	// 3. 쿼럼 계산
-	minDisks := dataBlocks
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo minDisks: %d", minDisks))
+	// if dataBlocks <= 0 || len(activeDisks) < dataBlocks {
+	// 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Error: Not enough active disks (%d) for the calculated dataBlocks (%d)", len(activeDisks), dataBlocks))
+	// 	return FileInfo{}, nil, nil, toObjectErr(errErasureReadQuorum, bucket, object)
+	// }
+	// // 3. 쿼럼 계산
+	// minDisks := dataBlocks
+	// logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo minDisks: %d", minDisks))
 
 	///////
 	rawArr := make([]RawFileInfo, er.setDriveCount)
@@ -813,6 +813,7 @@ func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object s
 	}
 
 	done := make(chan bool, er.setDriveCount)
+	disks := er.getDisks() // TODO: 수정
 
 	ropts := ReadOptions{
 		ReadData:         readData,
@@ -927,17 +928,17 @@ func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object s
 	// minDisks value is only to reduce the number of calls
 	// to the disks; this value is not accurate because we do
 	// not know the storage class of the object yet
-	// minDisks := 0
-	// if p := globalStorageClass.GetParityForSC(""); p > -1 {
-	// 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.setDriveCount: %d", er.setDriveCount))
-	// 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo p: %d", p))
-	// 	minDisks = er.setDriveCount - p
-	// } else {
-	// 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.setDriveCount: %d", er.setDriveCount))
-	// 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.defaultParityCount: %d", er.defaultParityCount))
-	// 	minDisks = er.setDriveCount - er.defaultParityCount
-	// }
-	// logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo minDisks: %d", minDisks))
+	minDisks := 0
+	if p := globalStorageClass.GetParityForSC(""); p > -1 {
+		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.setDriveCount: %d", er.setDriveCount))
+		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo p: %d", p))
+		minDisks = er.setDriveCount - p
+	} else {
+		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.setDriveCount: %d", er.setDriveCount))
+		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.defaultParityCount: %d", er.defaultParityCount))
+		minDisks = er.setDriveCount - er.defaultParityCount
+	}
+	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo minDisks: %d", minDisks))
 
 	calcQuorum := func(metaArr []FileInfo, errs []error) (FileInfo, []FileInfo, []StorageAPI, time.Time, string, error) {
 		readQuorum, _, err := objectQuorumFromMeta(ctx, metaArr, errs, er.defaultParityCount)
@@ -1047,12 +1048,18 @@ func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object s
 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo2 onlineDisks: %v", onlineDisks))
 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo2 len(onlineDisks): %v", len(onlineDisks)))
 
+	/// 기존 로직
+	if !fi.Deleted && len(fi.Erasure.Distribution) != len(onlineDisks) {
+		err := fmt.Errorf("unexpected file distribution (%v) from online disks (%v), looks like backend disks have been manually modified refusing to heal %s/%s(%s)",
+			fi.Erasure.Distribution, onlineDisks, bucket, object, opts.VersionID)
+		storageLogOnceIf(ctx, err, "get-object-file-info-manually-modified")
+		return fi, nil, nil, toObjectErr(err, bucket, object, opts.VersionID)
+	}
+	////
+
 	// 중요: 오브젝트가 저장된 분포(Distribution)에 맞게 onlineDisks와 metaArr를 재정렬합니다.
 	// 이는 topology가 바뀌거나 IDC 상태가 바뀌더라도, 각 오브젝트의 원래 저장 형태에 맞게 읽을 수 있게 합니다.
-	onlineDisks, onlineMeta = shuffleDisksAndPartsMetadataByIndex(onlineDisks, onlineMeta, fi)
-
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo3 onlineDisks: %v", onlineDisks))
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo3 len(onlineDisks): %v", len(onlineDisks)))
+	// onlineDisks, onlineMeta = shuffleDisksAndPartsMetadataByIndex(onlineDisks, onlineMeta, fi)
 
 	// 디스크의 XLV1 버전이 FileInfo의 XLV1 버전과 일치하는지 확인
 	filterOnlineDisksInplace(fi, onlineMeta, onlineDisks)
@@ -1081,19 +1088,19 @@ func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object s
 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo4 len(onlineDisks): %v", len(onlineDisks)))
 
 	// onlineDisks를 기준으로 Distribution 맵을 재구성하여 경고 대신 올바르게 처리함
-	nonNilDiskCount := 0
-	for i := range onlineDisks {
-		if onlineDisks[i] != nil {
-			nonNilDiskCount++
-		}
-	}
+	// nonNilDiskCount := 0
+	// for i := range onlineDisks {
+	// 	if onlineDisks[i] != nil {
+	// 		nonNilDiskCount++
+	// 	}
+	// }
 
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo5 nonNilDiskCount: %v", nonNilDiskCount))
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo5 fi.Erasure.DataBlocks: %v", fi.Erasure.DataBlocks))
+	// logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo5 nonNilDiskCount: %v", nonNilDiskCount))
+	// logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo5 fi.Erasure.DataBlocks: %v", fi.Erasure.DataBlocks))
 
-	if !fi.Deleted && nonNilDiskCount < fi.Erasure.DataBlocks {
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Warning: Available disks (%d) less than required data blocks (%d) for %s/%s", nonNilDiskCount, fi.Erasure.DataBlocks, bucket, object))
-	}
+	// if !fi.Deleted && nonNilDiskCount < fi.Erasure.DataBlocks {
+	// 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Warning: Available disks (%d) less than required data blocks (%d) for %s/%s", nonNilDiskCount, fi.Erasure.DataBlocks, bucket, object))
+	// }
 
 	select {
 	case mrfCheck <- fi.ShallowCopy():
