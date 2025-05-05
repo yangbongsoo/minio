@@ -1086,7 +1086,6 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 	activeIDCCount := len(activeIDCMap)
 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Total disks: %d, Active disks: %d from %d active IDCs", len(disks), len(activeDisks), activeIDCCount))
 
-	er.updateSetDriveCount(len(activeDisks))
 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo len(activeDisks): %d", len(activeDisks)))
 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.setDriveCount: %d", er.setDriveCount))
 
@@ -1115,14 +1114,18 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo minDisks: %d", minDisks))
 
 	///////
-	rawArr := make([]RawFileInfo, er.setDriveCount)
-	metaArr := make([]FileInfo, er.setDriveCount)
-	errs := make([]error, er.setDriveCount)
+	// rawArr := make([]RawFileInfo, er.setDriveCount)
+	// metaArr := make([]FileInfo, er.setDriveCount)
+	// errs := make([]error, er.setDriveCount)
+	rawArr := make([]RawFileInfo, len(activeDisks))
+	metaArr := make([]FileInfo, len(activeDisks))
+	errs := make([]error, len(activeDisks))
 	for i := range errs {
 		errs[i] = errDiskOngoingReq
 	}
 
-	done := make(chan bool, er.setDriveCount)
+	done := make(chan bool, len(activeDisks))
+	// done := make(chan bool, er.setDriveCount)
 	// disks := er.getDisks()
 
 	ropts := ReadOptions{
@@ -1147,11 +1150,13 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 				done <- false
 				continue
 			}
-			// idcName := disk.getMyIDC()
-			// if !activeIDCMap[idcName] {
-			// 	done <- false
-			// 	continue
-			// }
+			isMyIDCActive, idcName := disk.IsMyIDCActive()
+			if !isMyIDCActive {
+				logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfoIDC: Skipping inactive/offline disk: %s (IDC: %s, IDC Active: %t, Online: %t)",
+					disk.String(), idcName, isMyIDCActive, disk.IsOnline()))
+				done <- false
+				continue
+			}
 			if !disk.IsOnline() {
 				done <- false
 				continue
@@ -1248,7 +1253,6 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 	// 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.defaultParityCount: %d", er.defaultParityCount))
 	// 	minDisks = er.setDriveCount - er.defaultParityCount
 	// }
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo minDisks: %d", minDisks))
 
 	calcQuorum := func(metaArr []FileInfo, errs []error) (FileInfo, []FileInfo, []StorageAPI, time.Time, string, error) {
 		readQuorum, _, err := objectQuorumFromMeta(ctx, metaArr, errs, er.defaultParityCount)
@@ -1270,10 +1274,6 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 				onlineMeta[i] = metaArr[i]
 			}
 		}
-
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo onlineDisks: %v", onlineDisks))
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo len(onlineDisks): %v", len(onlineDisks)))
-
 		return fi, onlineMeta, onlineDisks, modTime, etag, nil
 	}
 
@@ -1305,7 +1305,8 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 			}
 		}
 
-		if totalResp < er.setDriveCount {
+		// if totalResp < er.setDriveCount {
+		if totalResp < len(activeDisks) {
 			if !opts.FastGetObjInfo {
 				continue
 			}
@@ -1317,7 +1318,8 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 		rw.Lock()
 		// when its a versioned bucket and empty versionID - at totalResp == setDriveCount
 		// we must use rawFileInfo to resolve versions to figure out the latest version.
-		if opts.VersionID == "" && totalResp == er.setDriveCount {
+		// if opts.VersionID == "" && totalResp == er.setDriveCount {
+		if opts.VersionID == "" && totalResp == len(activeDisks) {
 			fi, onlineMeta, onlineDisks, modTime, etag, err = calcQuorum(pickLatestQuorumFilesInfo(ctx,
 				rawArr, errs, bucket, object, readData, opts.InclFreeVersions))
 		} else {
@@ -1332,7 +1334,8 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 	if err != nil {
 		// We can only look for dangling if we received all the responses, if we did
 		// not we simply ignore it, since we can't tell for sure if its dangling object.
-		if totalResp == er.setDriveCount && shouldCheckForDangling(err, errs, bucket) {
+		// if totalResp == er.setDriveCount && shouldCheckForDangling(err, errs, bucket) {
+		if totalResp == len(activeDisks) && shouldCheckForDangling(err, errs, bucket) {
 			_, derr := er.deleteIfDangling(context.Background(), bucket, object, metaArr, errs, nil, opts)
 			if derr == nil {
 				if opts.VersionID != "" {
@@ -1393,24 +1396,6 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 		onlineMeta[i] = FileInfo{}
 		onlineDisks[i] = nil
 	}
-
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo4 onlineDisks: %v", onlineDisks))
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo4 len(onlineDisks): %v", len(onlineDisks)))
-
-	// onlineDisks를 기준으로 Distribution 맵을 재구성하여 경고 대신 올바르게 처리함
-	// nonNilDiskCount := 0
-	// for i := range onlineDisks {
-	// 	if onlineDisks[i] != nil {
-	// 		nonNilDiskCount++
-	// 	}
-	// }
-
-	// logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo5 nonNilDiskCount: %v", nonNilDiskCount))
-	// logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo5 fi.Erasure.DataBlocks: %v", fi.Erasure.DataBlocks))
-
-	// if !fi.Deleted && nonNilDiskCount < fi.Erasure.DataBlocks {
-	// 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Warning: Available disks (%d) less than required data blocks (%d) for %s/%s", nonNilDiskCount, fi.Erasure.DataBlocks, bucket, object))
-	// }
 
 	select {
 	case mrfCheck <- fi.ShallowCopy():

@@ -69,10 +69,6 @@ type erasureObjects struct {
 	nsMutex *nsLockMap
 }
 
-func (er erasureObjects) updateSetDriveCount(count int) {
-	er.setDriveCount = count
-}
-
 // NewNSLock - initialize a new namespace RWLocker instance.
 func (er erasureObjects) NewNSLock(bucket string, objects ...string) RWLocker {
 	return er.nsMutex.NewNSLock(er.getLockers, bucket, objects...)
