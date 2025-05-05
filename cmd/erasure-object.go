@@ -1145,7 +1145,8 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 		defer cancel()
 
 		wg := sync.WaitGroup{}
-		for i, disk := range disks {
+		// for i, disk := range disks {
+		for i, disk := range activeDisks {
 			if disk == nil {
 				done <- false
 				continue
