@@ -31,6 +31,7 @@ import (
 	"github.com/minio/minio/internal/crypto"
 	"github.com/minio/minio/internal/hash/sha256"
 	xhttp "github.com/minio/minio/internal/http"
+	"github.com/minio/minio/internal/logger"
 	"github.com/minio/pkg/v3/sync/errgroup"
 )
 
@@ -559,6 +560,7 @@ func objectQuorumFromMeta(ctx context.Context, partsMetaData []FileInfo, errs []
 		writeQuorum++
 	}
 
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS]objectQuorumFromMeta: dataBlocks: %d, parityBlocks: %d, writeQuorum: %d", dataBlocks, parityBlocks, writeQuorum))
 	// Since all the valid erasure code meta updated at the same time are equivalent, pass dataBlocks
 	// from latestFileInfo to get the quorum
 	return dataBlocks, writeQuorum, nil

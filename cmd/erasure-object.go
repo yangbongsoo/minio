@@ -1055,9 +1055,9 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 	disks := waitForAllDisks(er.getDisks(), 12, 30*time.Second) // work around test
 	//////
 
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("getObjectFileInfo.GetAllIDCInfo()"))
+	logger.LogIf(ctx, "", fmt.Errorf("getObjectFileInfo.GetAllIDCInfo()"))
 	for idcName, idcInfo := range GetAllIDCInfo() {
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[IDCInfo] IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
+		logger.LogIf(ctx, "", fmt.Errorf("[IDCInfo] IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
 	}
 
 	// 1. 온라인 디스크/IDC 필터링
@@ -1255,14 +1255,17 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 	// }
 
 	calcQuorum := func(metaArr []FileInfo, errs []error) (FileInfo, []FileInfo, []StorageAPI, time.Time, string, error) {
-		readQuorum, _, err := objectQuorumFromMeta(ctx, metaArr, errs, er.defaultParityCount)
+		// readQuorum, _, err := objectQuorumFromMeta(ctx, metaArr, errs, er.defaultParityCount)
+		readQuorum, _, err := objectQuorumFromMeta(ctx, metaArr, errs, 4)
 		if err != nil {
 			return FileInfo{}, nil, nil, time.Time{}, "", err
 		}
 		if err := reduceReadQuorumErrs(ctx, errs, objectOpIgnoredErrs, readQuorum); err != nil {
 			return FileInfo{}, nil, nil, time.Time{}, "", err
 		}
-		onlineDisks, modTime, etag := listOnlineDisks(disks, metaArr, errs, readQuorum)
+		// onlineDisks, modTime, etag := listOnlineDisks(disks, metaArr, errs, readQuorum)
+		onlineDisks, modTime, etag := listOnlineDisks(activeDisks, metaArr, errs, readQuorum)
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfoIDC.calcQuorumFunc onlineDisks: %v", onlineDisks))
 		fi, err := pickValidFileInfo(ctx, metaArr, modTime, etag, readQuorum)
 		if err != nil {
 			return FileInfo{}, nil, nil, time.Time{}, "", err
