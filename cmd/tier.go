@@ -24,7 +24,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/minio/minio/internal/logger"
 	"math/rand"
 	"net/http"
 	"path"
@@ -424,7 +423,7 @@ func (config *TierConfigMgr) getDriver(ctx context.Context, tierName string) (d 
 // if KMS is enabled, otherwise simply yields the json encoded bytes as is.
 // Similarly, ObjectOptions value depends on KMS' status.
 func (config *TierConfigMgr) configReader(ctx context.Context) (*PutObjReader, *ObjectOptions, error) {
-	logger.LogIf(context.Background(), "tier.go configReader", fmt.Errorf("[YBS] configReader 호출\n"))
+	//logger.LogIf(context.Background(), "tier.go configReader", fmt.Errorf("[YBS] configReader 호출\n"))
 	b, err := config.Bytes()
 	if err != nil {
 		return nil, nil, err
@@ -437,7 +436,7 @@ func (config *TierConfigMgr) configReader(ctx context.Context) (*PutObjReader, *
 		return nil, nil, err
 	}
 	if GlobalKMS == nil {
-		logger.LogIf(context.Background(), "tier.go configReader", fmt.Errorf("[YBS] GlobalKMS == nil. 그래서 MaxParity:true\n"))
+		//logger.LogIf(context.Background(), "tier.go configReader", fmt.Errorf("[YBS] GlobalKMS == nil. 그래서 MaxParity:true\n"))
 		return NewPutObjReader(hr), &ObjectOptions{MaxParity: true}, nil
 	}
 
@@ -465,7 +464,7 @@ func (config *TierConfigMgr) configReader(ctx context.Context) (*PutObjReader, *
 	if err != nil {
 		return nil, nil, err
 	}
-	logger.LogIf(context.Background(), "tier.go configReader 마지막", fmt.Errorf("[YBS]  MaxParity:true\n"))
+	//logger.LogIf(context.Background(), "tier.go configReader 마지막", fmt.Errorf("[YBS]  MaxParity:true\n"))
 	opts := &ObjectOptions{
 		UserDefined: metadata,
 		MTime:       UTCNow(),

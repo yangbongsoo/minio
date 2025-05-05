@@ -22,7 +22,7 @@ func init() {
 
 // startIDCTopologyMonitor는 IDC 토폴로지 모니터링 고루틴을 시작.
 func startIDCTopologyMonitor(ctx context.Context) error {
-	logger.LogIf(ctx, "idcTopology-monitor.startIDCTopologyMonitor", fmt.Errorf("[YBS] Starting IDC topology monitor...\n"))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] Starting IDC topology monitor...\n"))
 	// 초기 실행: 서버 시작 시 즉시 상태 로드 시도
 	idcInfoMap := updateIDCTopology(ctx, nil)
 	if idcInfoMap == nil {
@@ -34,18 +34,18 @@ func startIDCTopologyMonitor(ctx context.Context) error {
 		initTotalNodeCount := 0
 		for idcName, idcInfo := range idcInfoMap {
 			if idcInfo.IDCNodeInfos == nil {
-				logger.LogIf(ctx, "idcTopology-monitor.startIDCTopologyMonitor", fmt.Errorf("[YBS] idcName: %s, idcInfo.IDCNodeInfos == nil", idcName))
+				logger.LogIf(ctx, "", fmt.Errorf("[YBS] idcName: %s, idcInfo.IDCNodeInfos == nil", idcName))
 				time.Sleep(3 * time.Second)
 			} else {
-				logger.LogIf(ctx, "idcTopology-monitor.startIDCTopologyMonitor", fmt.Errorf("[YBS] idcName: %s, idcInfo.IDCNodeInfos != nil", idcName))
-				logger.LogIf(ctx, "idcTopology-monitor.startIDCTopologyMonitor", fmt.Errorf("[YBS] idcName: %s, idcInfo.TotalNodeCount: %d", idcName, idcInfo.TotalNodeCount))
-				logger.LogIf(ctx, "idcTopology-monitor.startIDCTopologyMonitor", fmt.Errorf("[YBS] idcName: %s, idcInfo.IsActive: %v", idcName, idcInfo.IsActive))
+				logger.LogIf(ctx, "", fmt.Errorf("[YBS] idcName: %s, idcInfo.IDCNodeInfos != nil", idcName))
+				logger.LogIf(ctx, "", fmt.Errorf("[YBS] idcName: %s, idcInfo.TotalNodeCount: %d", idcName, idcInfo.TotalNodeCount))
+				logger.LogIf(ctx, "", fmt.Errorf("[YBS] idcName: %s, idcInfo.IsActive: %v", idcName, idcInfo.IsActive))
 
 				initTotalNodeCount += idcInfo.TotalNodeCount
 			}
 		}
 		if initTotalNodeCount >= 12 {
-			logger.LogIf(ctx, "idcTopology-monitor.startIDCTopologyMonitor", fmt.Errorf("[YBS] initTotalNodeCount: %d", initTotalNodeCount))
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS] initTotalNodeCount: %d", initTotalNodeCount))
 			break
 		}
 		time.Sleep(1 * time.Second)
@@ -65,7 +65,7 @@ func monitorIDCTopology(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			logger.LogIf(ctx, "idcTopology-monitor.monitorIDCTopology", fmt.Errorf("[YBS] Stopping IDC topology monitor...\n"))
+			logger.LogIf(ctx, "-.monitorIDCTopology", fmt.Errorf("[YBS] Stopping IDC topology monitor...\n"))
 			return
 		case <-ticker.C:
 			updateIDCTopology(ctx, &lastModTime)

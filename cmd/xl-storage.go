@@ -398,7 +398,7 @@ func (s *xlStorage) String() string {
 }
 
 func (s *xlStorage) Hostname() string {
-	logger.LogIf(context.Background(), "xl-storage.go Hostname()", fmt.Errorf("[YBS] Hostname 호출 : %v \n", s.endpoint.Host))
+	//logger.LogIf(context.Background(), "xl-storage.go Hostname()", fmt.Errorf("[YBS] Hostname 호출 : %v \n", s.endpoint.Host))
 	return s.endpoint.Host
 }
 
@@ -420,7 +420,7 @@ func (s *xlStorage) LastConn() time.Time {
 }
 
 func (s *xlStorage) IsLocal() bool {
-	logger.LogIf(context.Background(), "xl-storage.go IsLocal()", fmt.Errorf("[YBS] IsLocal 호출. return true 하드코딩\n"))
+	//logger.LogIf(context.Background(), "xl-storage.go IsLocal()", fmt.Errorf("[YBS] IsLocal 호출. return true 하드코딩\n"))
 	return true
 }
 

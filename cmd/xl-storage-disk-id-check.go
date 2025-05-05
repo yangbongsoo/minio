@@ -218,7 +218,7 @@ func (p *xlStorageDiskIDCheck) LastConn() time.Time {
 }
 
 func (p *xlStorageDiskIDCheck) IsLocal() bool {
-	logger.LogIf(context.Background(), "xl-storage-disk-id-check.go IsLocal()", fmt.Errorf("[YBS] IsLocal 호출. p.storage.IsLocal() 로 위임. xl-stroage 로 위임\n"))
+	//logger.LogIf(context.Background(), "xl-storage-disk-id-check.go IsLocal()", fmt.Errorf("[YBS] IsLocal 호출. p.storage.IsLocal() 로 위임. xl-stroage 로 위임\n"))
 	return p.storage.IsLocal()
 }
 

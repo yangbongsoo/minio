@@ -374,7 +374,7 @@ func (er erasureObjects) ListMultipartUploads(ctx context.Context, bucket, objec
 // disks. `uploads.json` carries metadata regarding on-going multipart
 // operation(s) on the object.
 func (er erasureObjects) newMultipartUpload(ctx context.Context, bucket string, object string, opts ObjectOptions) (*NewMultipartUploadResult, error) {
-	logger.LogIf(ctx, "erasure-multipart.newMultipartUpload", fmt.Errorf("[YBS] bucket: %s, object: %s, opts: %v\n", bucket, object, opts))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] bucket: %s, object: %s, opts: %v\n", bucket, object, opts))
 	if opts.CheckPrecondFn != nil {
 		if !opts.NoLock {
 			ns := er.NewNSLock(bucket, object)
@@ -401,10 +401,10 @@ func (er erasureObjects) newMultipartUpload(ctx context.Context, bucket string, 
 		userDefined["etag"] = opts.PreserveETag
 	}
 	onlineDisks := er.getDisks()
-	logger.LogIf(ctx, "erasure-multipart.newMultipartUpload", fmt.Errorf("[YBS] onlineDisks 갯수: %v\n", len(onlineDisks)))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] onlineDisks 갯수: %v\n", len(onlineDisks)))
 	for i, disk := range onlineDisks {
 		if disk == nil {
-			logger.LogIf(ctx, "erasure-multipart.newMultipartUpload", fmt.Errorf("[YBS] 디스크[%d]: nil\n", i))
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS] 디스크[%d]: nil\n", i))
 			continue
 		}
 
@@ -420,7 +420,7 @@ func (er erasureObjects) newMultipartUpload(ctx context.Context, bucket string, 
 
 	// Get parity and data drive count based on storage class metadata
 	parityDrives := globalStorageClass.GetParityForSC(userDefined[xhttp.AmzStorageClass])
-	logger.LogIf(ctx, "erasure-multipart.newMultipartUpload", fmt.Errorf("[YBS] parityDrives step1: %d\n", parityDrives))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] parityDrives step1: %d\n", parityDrives))
 
 	if parityDrives < 0 {
 		parityDrives = er.defaultParityCount
@@ -534,18 +534,18 @@ func (er erasureObjects) newMultipartUpload(ctx context.Context, bucket string, 
 	}
 
 	onlineDisks, partsMetadata = shuffleDisksAndPartsMetadata(onlineDisks, partsMetadata, fi)
-	logger.LogIf(ctx, "erasure-multipart.newMultipartUpload", fmt.Errorf("[YBS] onlineDisks 개수: %d\n", len(onlineDisks)))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] onlineDisks 개수: %d\n", len(onlineDisks)))
 	for i, disk := range onlineDisks {
 		if disk == nil {
-			logger.LogIf(ctx, "erasure-multipart.newMultipartUpload", fmt.Errorf("[YBS] onlineDisks[%d]: nil\n", i))
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS] onlineDisks[%d]: nil\n", i))
 		} else {
-			logger.LogIf(ctx, "erasure-multipart.newMultipartUpload", fmt.Errorf("[YBS] onlineDisks[%d]: %s, 온라인 상태: %v\n", i, disk.String(), disk.IsOnline()))
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS] onlineDisks[%d]: %s, 온라인 상태: %v\n", i, disk.String(), disk.IsOnline()))
 		}
 	}
 
-	logger.LogIf(ctx, "erasure-multipart.newMultipartUpload", fmt.Errorf("[YBS] partsMetadata 개수: %d\n", len(partsMetadata)))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] partsMetadata 개수: %d\n", len(partsMetadata)))
 	for i, part := range partsMetadata {
-		logger.LogIf(ctx, "erasure-multipart.newMultipartUpload", fmt.Errorf("[YBS] partsMetadata[%d]: DataBlocks=%d, ParityBlocks=%d, Distribution=%v\n",
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] partsMetadata[%d]: DataBlocks=%d, ParityBlocks=%d, Distribution=%v\n",
 			i, part.Erasure.DataBlocks, part.Erasure.ParityBlocks, part.Erasure.Distribution))
 	}
 
@@ -626,7 +626,7 @@ func (er erasureObjects) renamePart(ctx context.Context, disks []StorageAPI, src
 //
 // Implements S3 compatible Upload Part API.
 func (er erasureObjects) PutObjectPart(ctx context.Context, bucket, object, uploadID string, partID int, r *PutObjReader, opts ObjectOptions) (pi PartInfo, err error) {
-	logger.LogIf(ctx, "erasure-multipart.PutObjectPart", fmt.Errorf("[YBS] bucket: %s, object: %s, uploadID: %s, partID: %d, opts: %v\n", bucket, object, uploadID, partID, opts))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] bucket: %s, object: %s, uploadID: %s, partID: %d, opts: %v\n", bucket, object, uploadID, partID, opts))
 	if !opts.NoAuditLog {
 		auditObjectErasureSet(ctx, "PutObjectPart", object, &er)
 	}
@@ -649,14 +649,14 @@ func (er erasureObjects) PutObjectPart(ctx context.Context, bucket, object, uplo
 	}
 
 	onlineDisks := er.getDisks()
-	logger.LogIf(ctx, "erasure-multipart.PutObjectPart", fmt.Errorf("[YBS] onlineDisks 개수: %d\n", len(onlineDisks)))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] onlineDisks 개수: %d\n", len(onlineDisks)))
 	for i, disk := range onlineDisks {
 		if disk == nil {
-			logger.LogIf(ctx, "erasure-multipart.PutObjectPart", fmt.Errorf("[YBS] onlineDisks[%d]: nil\n", i))
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS] onlineDisks[%d]: nil\n", i))
 		}
 	}
 	writeQuorum := fi.WriteQuorum(er.defaultWQuorum())
-	logger.LogIf(ctx, "erasure-multipart.PutObjectPart", fmt.Errorf("[YBS] writeQuorum: %d\n", writeQuorum))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] writeQuorum: %d\n", writeQuorum))
 	if cs := fi.Metadata[hash.MinIOMultipartChecksum]; cs != "" {
 		if r.ContentCRCType().String() != cs {
 			return pi, InvalidArgument{
@@ -666,12 +666,12 @@ func (er erasureObjects) PutObjectPart(ctx context.Context, bucket, object, uplo
 			}
 		}
 	}
-	logger.LogIf(ctx, "erasure-multipart.PutObjectPart", fmt.Errorf("[YBS] fi.Erasure.Distribution: %v\n", fi.Erasure.Distribution))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] fi.Erasure.Distribution: %v\n", fi.Erasure.Distribution))
 	onlineDisks = shuffleDisks(onlineDisks, fi.Erasure.Distribution)
-	logger.LogIf(ctx, "erasure-multipart.PutObjectPart", fmt.Errorf("[YBS] onlineDisks 개수: %d\n", len(onlineDisks)))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] onlineDisks 개수: %d\n", len(onlineDisks)))
 	for i, disk := range onlineDisks {
 		if disk == nil {
-			logger.LogIf(ctx, "erasure-multipart.PutObjectPart", fmt.Errorf("[YBS] onlineDisks[%d]: nil\n", i))
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS] onlineDisks[%d]: nil\n", i))
 		}
 	}
 
@@ -690,7 +690,7 @@ func (er erasureObjects) PutObjectPart(ctx context.Context, bucket, object, uplo
 		}
 	}()
 
-	logger.LogIf(ctx, "erasure-multipart.PutObjectPart", fmt.Errorf("[YBS] fi.Erasure.DataBlocks: %d, fi.Erasure.ParityBlocks: %d, fi.Erasure.BlockSize: %d\n", fi.Erasure.DataBlocks, fi.Erasure.ParityBlocks, fi.Erasure.BlockSize))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] fi.Erasure.DataBlocks: %d, fi.Erasure.ParityBlocks: %d, fi.Erasure.BlockSize: %d\n", fi.Erasure.DataBlocks, fi.Erasure.ParityBlocks, fi.Erasure.BlockSize))
 	erasure, err := NewErasure(ctx, fi.Erasure.DataBlocks, fi.Erasure.ParityBlocks, fi.Erasure.BlockSize)
 	if err != nil {
 		return pi, toObjectErr(err, bucket, object)
