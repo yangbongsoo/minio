@@ -1053,8 +1053,6 @@ func (er erasureObjects) getObjectFileInfoOriginal(ctx context.Context, bucket s
 func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string, object string, opts ObjectOptions, readData bool) (FileInfo, []FileInfo, []StorageAPI, error) {
 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfoIDC called: %s/%s", bucket, object))
 	disks := waitForAllDisks(er.getDisks(), 12, 30*time.Second) // work around test
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo len(disks): %d", len(disks)))
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.setDriveCount: %d", er.setDriveCount))
 	//////
 
 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("getObjectFileInfo.GetAllIDCInfo()"))
@@ -1087,6 +1085,10 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 	}
 	activeIDCCount := len(activeIDCMap)
 	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Total disks: %d, Active disks: %d from %d active IDCs", len(disks), len(activeDisks), activeIDCCount))
+
+	er.updateSetDriveCount(len(activeDisks))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo len(activeDisks): %d", len(activeDisks)))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.setDriveCount: %d", er.setDriveCount))
 
 	// 2. 동적 EC 파라미터 결정
 	var dataBlocks, parityBlocks int
@@ -1353,9 +1355,9 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 		return fi, nil, nil, toObjectErr(err, bucket, object)
 	}
 
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo2 onlineDisks: %v", onlineDisks))
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo2 len(onlineDisks): %v", len(onlineDisks)))
-
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo2 onlineDisks: %v", onlineDisks))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo2 len(onlineDisks): %v", len(onlineDisks)))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo2 fi.Erasure.Distribution: %v", fi.Erasure.Distribution))
 	/// 기존 로직
 	// if !fi.Deleted && len(fi.Erasure.Distribution) != len(onlineDisks) {
 	// 	err := fmt.Errorf("unexpected file distribution (%v) from online disks (%v), looks like backend disks have been manually modified refusing to heal %s/%s(%s)",
@@ -1939,7 +1941,8 @@ func (er erasureObjects) putObjectIDC(ctx context.Context, bucket string, object
 	// Initialize parts metadata
 	// partsMetadata := make([]FileInfo, len(storageDisks))
 
-	er.updateSetDriveCount(len(activeDisks))
+	// put 호출시 업데이트 해도 get 에서 반영안됌
+	// er.updateSetDriveCount(len(activeDisks))
 
 	partsMetadata := make([]FileInfo, len(activeDisks))
 
