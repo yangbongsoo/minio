@@ -759,14 +759,13 @@ func (er erasureObjects) getObjectInfo(ctx context.Context, bucket, object strin
 }
 
 func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object string, opts ObjectOptions, readData bool) (FileInfo, []FileInfo, []StorageAPI, error) {
-	// if strings.HasPrefix(bucket, ".") || strings.HasPrefix(object, ".") {
-	// 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfo->getObjectFileInfoOriginal bucket : %s AND object : %s", bucket, object))
-	// 	return er.getObjectFileInfoOriginal(ctx, bucket, object, opts, readData)
-	// } else {
-	// 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfo->getObjectFileInfoIDC bucket : %s AND object : %s", bucket, object))
-	// 	return er.getObjectFileInfoIDC(ctx, bucket, object, opts, readData)
-	// }
-	return er.getObjectFileInfoIDC(ctx, bucket, object, opts, readData)
+	if strings.HasPrefix(bucket, ".") || strings.HasPrefix(object, ".") {
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfo->getObjectFileInfoOriginal bucket : %s AND object : %s", bucket, object))
+		return er.getObjectFileInfoOriginal(ctx, bucket, object, opts, readData)
+	} else {
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfo->getObjectFileInfoIDC bucket : %s AND object : %s", bucket, object))
+		return er.getObjectFileInfoIDC(ctx, bucket, object, opts, readData)
+	}
 }
 
 func (er erasureObjects) getObjectFileInfoOriginal(ctx context.Context, bucket string, object string, opts ObjectOptions, readData bool) (FileInfo, []FileInfo, []StorageAPI, error) {
@@ -1731,14 +1730,13 @@ func (er erasureObjects) putMetacacheObject(ctx context.Context, key string, r *
 // writes `xl.meta` which carries the necessary metadata for future
 // object operations.
 func (er erasureObjects) PutObject(ctx context.Context, bucket string, object string, data *PutObjReader, opts ObjectOptions) (objInfo ObjectInfo, err error) {
-	// if strings.HasPrefix(bucket, ".") || strings.HasPrefix(object, ".") {
-	// 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] PutObject->putObject bucket : %s AND object : %s", bucket, object))
-	// 	return er.putObject(ctx, bucket, object, data, opts)
-	// } else {
-	// 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] PutObject->putObjectIDC bucket : %s AND object : %s", bucket, object))
-	// 	return er.putObjectIDC(ctx, bucket, object, data, opts)
-	// }
-	return er.putObjectIDC(ctx, bucket, object, data, opts)
+	if strings.HasPrefix(bucket, ".") || strings.HasPrefix(object, ".") {
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] PutObject->putObject bucket : %s AND object : %s", bucket, object))
+		return er.putObject(ctx, bucket, object, data, opts)
+	} else {
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] PutObject->putObjectIDC bucket : %s AND object : %s", bucket, object))
+		return er.putObjectIDC(ctx, bucket, object, data, opts)
+	}
 }
 
 // putObject wrapper for erasureObjects PutObject
