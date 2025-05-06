@@ -1093,13 +1093,14 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 	var dataBlocks, parityBlocks int
 	switch {
 	case activeIDCCount >= 3:
-		parityBlocks = 5 // EC:12 (7+5)
+		parityBlocks = 5 // EC:12(7+5)
 		dataBlocks = len(activeDisks) - parityBlocks
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Applying EC:12 (Parity 5) for %d active IDCs", activeIDCCount))
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfoIDC EC:12(7+5) activeIDCCount: %d, dataBlocks: %d, parityBlocks: %d", activeIDCCount, dataBlocks, parityBlocks))
 	case activeIDCCount == 2:
-		parityBlocks = 4 // EC:8 (4+4)
+		activeDisks = activeDisks[:7]
+		parityBlocks = 3 // EC:7(4+3)
 		dataBlocks = len(activeDisks) - parityBlocks
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Applying EC:8 (Parity 4) for %d active IDCs", activeIDCCount))
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfoIDC EC:7(4+3) activeIDCCount: %d, dataBlocks: %d, parityBlocks: %d", activeIDCCount, dataBlocks, parityBlocks))
 	default:
 		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Error: Not enough active IDCs (%d) to perform read operation. Minimum 2 required", activeIDCCount))
 		return FileInfo{}, nil, nil, toObjectErr(errErasureReadQuorum, bucket, object)
@@ -1829,28 +1830,31 @@ func (er erasureObjects) putObjectIDC(ctx context.Context, bucket string, object
 	logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Total disks: %d, Active disks: %d from %d active IDCs", len(storageDisks), len(activeDisks), len(activeIDCMap)))
 
 	// 2. 동적 EC 설정 가져오기
-	var currentParity int
+	var parityDrives int
+	var dataDrives int
 	switch {
 	case activeIDCCount >= 3:
-		currentParity = 5 // EC:12 (7+5)
-		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Applying EC:12 (Parity 5) for %d active IDCs", activeIDCCount))
+		parityDrives = 5                             // EC:12(7+5)
+		dataDrives = len(activeDisks) - parityDrives // 12 - 5 = 7
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObjectIDC EC:12(7+5) activeIDCCount: %d, dataDrives: %d, parityDrives: %d", activeIDCCount, dataDrives, parityDrives))
 	case activeIDCCount == 2:
-		currentParity = 4 // EC:8 (4+4)
-		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Applying EC:8 (Parity 4) for %d active IDCs", activeIDCCount))
+		activeDisks = activeDisks[:7]                // 7개만 사용
+		parityDrives = 3                             // EC:7(4+3)
+		dataDrives = len(activeDisks) - parityDrives // 7 - 3 = 4
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObjectIDC EC:7(4+3) activeIDCCount: %d, dataDrives: %d, parityDrives: %d", activeIDCCount, dataDrives, parityDrives))
 	default:
 		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Error: Not enough active IDCs (%d) to perform write operation. Minimum 2 required", activeIDCCount))
 		// Use a specific error for IDC quorum failure if available, otherwise fallback
 		var errQuorumIDC error = errErasureWriteQuorum // Placeholder, define errErasureWriteQuorumIDC if needed
 		return ObjectInfo{}, toObjectErr(errQuorumIDC, bucket, object)
 	}
-	parityDrives := currentParity
 
 	// 3. 데이터/패리티 드라이브 및 쿼럼 재계산 (activeDisks 기준)
 	if len(activeDisks) <= parityDrives {
 		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Error: Not enough active disks (%d) for the calculated parity (%d)", len(activeDisks), parityDrives))
 		return ObjectInfo{}, toObjectErr(errErasureWriteQuorum, bucket, object)
 	}
-	dataDrives := len(activeDisks) - parityDrives
+	// dataDrives := len(activeDisks) - parityDrives
 	writeQuorum := dataDrives
 	if dataDrives == parityDrives {
 		writeQuorum++
@@ -1869,17 +1873,17 @@ func (er erasureObjects) putObjectIDC(ctx context.Context, bucket string, object
 	//	 parityDrives = er.defaultParityCount
 	// }
 	//logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives step2: %d\n", parityDrives))
-	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] false 강제전, opts.MaxParity: %v", opts.MaxParity))
+	// logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] false 강제전, opts.MaxParity: %v", opts.MaxParity))
 	opts.MaxParity = false
 	// if opts.MaxParity {
 	// 	parityDrives = len(storageDisks) / 2
 	// }
-	logger.LogIf(
-		ctx,
-		"erasure-object.PutObject",
-		fmt.Errorf("[YBS] parityDrives step3: %d, opts.MaxParity: %v, globalStorageClass.AvailabilityOptimized(): %v\n",
-			parityDrives, opts.MaxParity, globalStorageClass.AvailabilityOptimized()),
-	)
+	// logger.LogIf(
+	// 	ctx,
+	// 	"erasure-object.PutObject",
+	// 	fmt.Errorf("[YBS] parityDrives step3: %d, opts.MaxParity: %v, globalStorageClass.AvailabilityOptimized(): %v\n",
+	// 		parityDrives, opts.MaxParity, globalStorageClass.AvailabilityOptimized()),
+	// )
 
 	// if !opts.MaxParity && globalStorageClass.AvailabilityOptimized() {
 	// 	// If we have offline disks upgrade the number of erasure codes for this object.
@@ -1916,9 +1920,9 @@ func (er erasureObjects) putObjectIDC(ctx context.Context, bucket string, object
 	// 	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives step4: %d\n", parityDrives))
 	// }
 	// dataDrives := len(storageDisks) - parityDrives
-	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] dataDrives: %d", dataDrives))
-	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] len(storageDisks): %d", len(storageDisks)))
-	logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives: %d", parityDrives))
+	// logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] dataDrives: %d", dataDrives))
+	// logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] len(storageDisks): %d", len(storageDisks)))
+	// logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] parityDrives: %d", parityDrives))
 	// we now know the number of blocks this object needs for data and parity.
 	// writeQuorum is dataBlocks + 1
 	// writeQuorum := dataDrives
@@ -1929,10 +1933,6 @@ func (er erasureObjects) putObjectIDC(ctx context.Context, bucket string, object
 
 	// Initialize parts metadata
 	// partsMetadata := make([]FileInfo, len(storageDisks))
-
-	// put 호출시 업데이트 해도 get 에서 반영안됌
-	// er.updateSetDriveCount(len(activeDisks))
-
 	partsMetadata := make([]FileInfo, len(activeDisks))
 
 	fi := newFileInfo(pathJoin(bucket, object), dataDrives, parityDrives)
