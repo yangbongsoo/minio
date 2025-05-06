@@ -1063,7 +1063,7 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 	activeDisks, activeIDCMap, activeIDCCount := er.GetActiveInfo(ctx, disks)
 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfoIDC Total disks: %d, Active disks: %d from %d active IDCs", len(disks), len(activeDisks), len(activeIDCMap)))
 
-	dataBlocks, _, returnFlag := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
+	activeDisks, dataBlocks, _, returnFlag := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
 	if returnFlag {
 		return FileInfo{}, nil, nil, toObjectErr(errErasureReadQuorum, bucket, object)
 	}
@@ -1749,7 +1749,7 @@ func (er erasureObjects) putObjectIDC(ctx context.Context, bucket string, object
 	activeDisks, activeIDCMap, activeIDCCount := er.GetActiveInfo(ctx, storageDisks)
 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObjectIDC Total disks: %d, Active disks: %d from %d active IDCs", len(storageDisks), len(activeDisks), len(activeIDCMap)))
 
-	dataDrives, parityDrives, returnFlag := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
+	activeDisks, dataDrives, parityDrives, returnFlag := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
 	if returnFlag {
 		return ObjectInfo{}, toObjectErr(errErasureWriteQuorum, bucket, object)
 	}
@@ -2154,7 +2154,7 @@ func (er erasureObjects) GetActiveInfo(ctx context.Context, storageDisks []Stora
 	return activeDisks, activeIDCMap, len(activeIDCMap)
 }
 
-func (er erasureObjects) DecideErasureCodingParameter(ctx context.Context, activeDisks []StorageAPI, activeIDCCount int) (int, int, bool) {
+func (er erasureObjects) DecideErasureCodingParameter(ctx context.Context, activeDisks []StorageAPI, activeIDCCount int) ([]StorageAPI, int, int, bool) {
 	var dataBlocks, parityBlocks int
 	var returnFlag bool
 	switch {
@@ -2174,7 +2174,7 @@ func (er erasureObjects) DecideErasureCodingParameter(ctx context.Context, activ
 		logger.LogIf(ctx, "", fmt.Errorf("[YBS] DecideErasureCodingParameter Error: Not enough active IDCs (%d) to perform read operation. Minimum 2 required", activeIDCCount))
 	}
 
-	return dataBlocks, parityBlocks, returnFlag
+	return activeDisks, dataBlocks, parityBlocks, returnFlag
 }
 
 func (er erasureObjects) putObject(ctx context.Context, bucket string, object string, r *PutObjReader, opts ObjectOptions) (objInfo ObjectInfo, err error) {
