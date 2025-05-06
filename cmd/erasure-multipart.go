@@ -541,11 +541,6 @@ func (er erasureObjects) newMultipartUpload(ctx context.Context, bucket string, 
 	if dataDrives == parityDrives {
 		writeQuorum++
 	}
-	logger.LogIf(
-		ctx,
-		"erasure-multipart.newMultipartUpload",
-		fmt.Errorf("[YBS] writeQuorum: %d", writeQuorum),
-	)
 
 	// Initialize parts metadata
 	partsMetadata := make([]FileInfo, len(onlineDisks))
@@ -841,7 +836,6 @@ func (er erasureObjects) putObjectPart(ctx context.Context, bucket string, objec
 		}
 	}
 	writeQuorum := fi.WriteQuorum(er.defaultWQuorum())
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS] writeQuorum: %d", writeQuorum))
 	if cs := fi.Metadata[hash.MinIOMultipartChecksum]; cs != "" {
 		if r.ContentCRCType().String() != cs {
 			return pi, InvalidArgument{
@@ -1047,7 +1041,6 @@ func (er erasureObjects) putObjectPartIDC(ctx context.Context, bucket string, ob
 	// onlineDisks := er.getDisks()
 	activeDisks, _, _ := er.GetActiveInfo(ctx, er.getDisks())
 	writeQuorum := fi.WriteQuorum(er.defaultWQuorum())
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS] writeQuorum: %d", writeQuorum))
 	if cs := fi.Metadata[hash.MinIOMultipartChecksum]; cs != "" {
 		if r.ContentCRCType().String() != cs {
 			return pi, InvalidArgument{

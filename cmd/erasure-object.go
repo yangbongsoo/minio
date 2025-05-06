@@ -1834,7 +1834,6 @@ func (er erasureObjects) putObjectIDC(ctx context.Context, bucket string, object
 	// if dataDrives == parityDrives {
 	// 	writeQuorum++
 	// }
-	// logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] writeQuorum: %d\n", writeQuorum))
 
 	// Initialize parts metadata
 	// partsMetadata := make([]FileInfo, len(storageDisks))
