@@ -70,16 +70,36 @@ func (er erasureObjects) checkUploadIDExists(ctx context.Context, bucket, object
 
 	uploadIDPath := er.getUploadIDDir(bucket, object, uploadID)
 
-	// storageDisks := er.getDisks()
+	// 1차: 현재 activeDisks로 partsMetadata를 읽음
 	activeDisks, _, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks())
 	activeDisks, dataDrives, parityDrives, _ := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
 
-	// Read metadata associated with the object from all disks.
 	partsMetadata, errs := readAllFileInfo(ctx, activeDisks, bucket, minioMetaMultipartBucket,
 		uploadIDPath, "", false, false)
 
-	// dataBlocks, writeQuorum(dataBlocks), nil
-	// readQuorum, writeQuorum, err := objectQuorumFromMeta(ctx, partsMetadata, errs, 3)
+	// partsMetadata에서 유효한 FileInfo가 있으면, 그 분포(Distribution)에 맞춰 activeDisks를 재정렬
+	var foundValidFI *FileInfo
+	for i := range partsMetadata {
+		if partsMetadata[i].IsValid() && len(partsMetadata[i].Erasure.Distribution) > 0 {
+			foundValidFI = &partsMetadata[i]
+			break
+		}
+	}
+
+	if foundValidFI != nil {
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] checkUploadIDExists foundValidFI: %v", foundValidFI))
+		// 분포에 맞춰 activeDisks를 재정렬
+		if len(activeDisks) == len(foundValidFI.Erasure.Distribution) {
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS] checkUploadIDExists shuffleDisks"))
+			activeDisks = shuffleDisks(activeDisks, foundValidFI.Erasure.Distribution)
+			// 다시 partsMetadata를 읽음 (분포 일치 보장)
+			partsMetadata, errs = readAllFileInfo(ctx, activeDisks, bucket, minioMetaMultipartBucket,
+				uploadIDPath, "", false, false)
+			dataDrives = foundValidFI.Erasure.DataBlocks
+			parityDrives = foundValidFI.Erasure.ParityBlocks
+		}
+	}
+
 	readQuorum := dataDrives
 	writeQuorum := dataDrives
 	_ = parityDrives
@@ -100,7 +120,6 @@ func (er erasureObjects) checkUploadIDExists(ctx context.Context, bucket, object
 		quorum = writeQuorum
 	}
 
-	// List all online disks.
 	_, modTime, etag := listOnlineDisks(activeDisks, partsMetadata, errs, quorum)
 
 	if write {
@@ -112,7 +131,6 @@ func (er erasureObjects) checkUploadIDExists(ctx context.Context, bucket, object
 		return fi, nil, nil, err
 	}
 
-	// Pick one from the first valid metadata.
 	fi, err = pickValidFileInfo(ctx, partsMetadata, modTime, etag, quorum)
 	return fi, partsMetadata, activeDisks, err
 }
