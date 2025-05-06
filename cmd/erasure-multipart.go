@@ -804,8 +804,10 @@ func (er erasureObjects) PutObjectPart(ctx context.Context, bucket, object, uplo
 		auditObjectErasureSet(ctx, "PutObjectPart", object, &er)
 	}
 	if strings.HasPrefix(bucket, ".") || strings.HasPrefix(object, ".") {
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] PutObjectPart->putObjectPart bucket : %s AND object : %s", bucket, object))
 		return er.putObjectPart(ctx, bucket, object, uploadID, partID, r, opts, pi, err)
 	} else {
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] PutObjectPart->putObjectPartIDC bucket : %s AND object : %s", bucket, object))
 		return er.putObjectPartIDC(ctx, bucket, object, uploadID, partID, r, opts, pi, err)
 	}
 }
@@ -1032,6 +1034,7 @@ func (er erasureObjects) putObjectPartIDC(ctx context.Context, bucket string, ob
 	// Validates if upload ID exists.
 	fi, _, err := er.checkUploadIDExists(ctx, bucket, object, uploadID, true)
 	if err != nil {
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObjectPartIDC err: %v", err))
 		if errors.Is(err, errVolumeNotFound) {
 			return pi, toObjectErr(err, bucket)
 		}
@@ -1052,7 +1055,7 @@ func (er erasureObjects) putObjectPartIDC(ctx context.Context, bucket string, ob
 	}
 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObjectPartIDC fi.Erasure.Distribution: %v", fi.Erasure.Distribution))
 	activeDisks = shuffleDisks(activeDisks, fi.Erasure.Distribution)
-
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObjectPartIDC activeDisks: %v", activeDisks))
 	// Need a unique name for the part being written in minioMetaBucket to
 	// accommodate concurrent PutObjectPart requests
 
@@ -1068,7 +1071,7 @@ func (er erasureObjects) putObjectPartIDC(ctx context.Context, bucket string, ob
 		}
 	}()
 
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS] fi.Erasure.DataBlocks: %d, fi.Erasure.ParityBlocks: %d, fi.Erasure.BlockSize: %d", fi.Erasure.DataBlocks, fi.Erasure.ParityBlocks, fi.Erasure.BlockSize))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObjectPartIDC fi.Erasure.DataBlocks: %d, fi.Erasure.ParityBlocks: %d, fi.Erasure.BlockSize: %d", fi.Erasure.DataBlocks, fi.Erasure.ParityBlocks, fi.Erasure.BlockSize))
 	erasure, err := NewErasure(ctx, fi.Erasure.DataBlocks, fi.Erasure.ParityBlocks, fi.Erasure.BlockSize)
 	if err != nil {
 		return pi, toObjectErr(err, bucket, object)
