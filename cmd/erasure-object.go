@@ -1060,49 +1060,11 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 		logger.LogIf(ctx, "", fmt.Errorf("[IDCInfo] IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
 	}
 
-	// 1. 온라인 디스크/IDC 필터링
-	activeDisks := make([]StorageAPI, 0, len(disks))
-	activeIDCMap := make(map[string]bool)
-	for _, disk := range disks {
-		if disk == nil {
-			continue
-		}
-		storageInstance, ok := disk.(StorageAPI)
-		if !ok {
-			logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Disk is not of type StorageAPI: %T", disk))
-			continue
-		}
-		isMyIDCActive, idcName := storageInstance.IsMyIDCActive()
-		if isMyIDCActive && storageInstance.IsOnline() {
-			activeDisks = append(activeDisks, disk)
-			if idcName != "" {
-				activeIDCMap[idcName] = true
-			}
-		} else {
-			logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Skipping inactive/offline disk: %s (IDC: %s, IDC Active: %t, Online: %t)",
-				disk.String(), idcName, isMyIDCActive, storageInstance.IsOnline()))
-		}
-	}
-	activeIDCCount := len(activeIDCMap)
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Total disks: %d, Active disks: %d from %d active IDCs", len(disks), len(activeDisks), activeIDCCount))
+	activeDisks, activeIDCMap, activeIDCCount := er.GetActiveInfo(ctx, disks)
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfoIDC Total disks: %d, Active disks: %d from %d active IDCs", len(disks), len(activeDisks), len(activeIDCMap)))
 
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo len(activeDisks): %d", len(activeDisks)))
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.setDriveCount: %d", er.setDriveCount))
-
-	// 2. 동적 EC 파라미터 결정
-	var dataBlocks, parityBlocks int
-	switch {
-	case activeIDCCount >= 3:
-		parityBlocks = 5 // EC:12(7+5)
-		dataBlocks = len(activeDisks) - parityBlocks
-		logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfoIDC EC:12(7+5) activeIDCCount: %d, dataBlocks: %d, parityBlocks: %d", activeIDCCount, dataBlocks, parityBlocks))
-	case activeIDCCount == 2:
-		activeDisks = activeDisks[:7]
-		parityBlocks = 3 // EC:7(4+3)
-		dataBlocks = len(activeDisks) - parityBlocks
-		logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfoIDC EC:7(4+3) activeIDCCount: %d, dataBlocks: %d, parityBlocks: %d", activeIDCCount, dataBlocks, parityBlocks))
-	default:
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Error: Not enough active IDCs (%d) to perform read operation. Minimum 2 required", activeIDCCount))
+	dataBlocks, _, returnFlag := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
+	if returnFlag {
 		return FileInfo{}, nil, nil, toObjectErr(errErasureReadQuorum, bucket, object)
 	}
 
@@ -1779,74 +1741,17 @@ func (er erasureObjects) putObjectIDC(ctx context.Context, bucket string, object
 	userDefined := cloneMSS(opts.UserDefined)
 
 	storageDisks := waitForAllDisks(er.getDisks(), 12, 30*time.Second) // work around test
-	// storageDisks := er.getDisks()
-	//logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] storageDisks 갯수 : %d\n", len(storageDisks)))
-	//for i, disk := range storageDisks {
-	//	if disk == nil {
-	//		//logger.LogIf(ctx, "erasure-object.PutObject", fmt.Errorf("[YBS] 디스크[%d]: nil\n", i))
-	//		continue
-	//	}
-	//
-	//	isOnline := disk.IsOnline()
-	//	isLocal := disk.IsLocal()
-	//	diskInfo := disk.String()
-	//	logger.LogIf(
-	//		ctx,
-	//		"erasure-object.PutObject",
-	//		fmt.Errorf("[YBS] 디스크[%d]: %s, 온라인 상태: %v, 로컬 상태: %v\n", i, diskInfo, isOnline, isLocal),
-	//	)
-	//}
 
-	logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("putObject.GetAllIDCInfo()"))
 	for idcName, idcInfo := range GetAllIDCInfo() {
-		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[IDCInfo] IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObejctIDC IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
 	}
 
-	// 1. 활성 IDC 디스크 필터링
-	activeDisks := make([]StorageAPI, 0, len(storageDisks))
-	activeIDCMap := make(map[string]bool)
-	for _, disk := range storageDisks {
-		if disk == nil {
-			continue
-		}
-		storageInstance, ok := disk.(StorageAPI)
-		if !ok {
-			logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Disk is not of type StorageAPI: %T", disk))
-			continue
-		}
+	activeDisks, activeIDCMap, activeIDCCount := er.GetActiveInfo(ctx, storageDisks)
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObjectIDC Total disks: %d, Active disks: %d from %d active IDCs", len(storageDisks), len(activeDisks), len(activeIDCMap)))
 
-		isMyIDCActive, idcName := storageInstance.IsMyIDCActive()
-		if isMyIDCActive && storageInstance.IsOnline() {
-			activeDisks = append(activeDisks, disk)
-			if idcName != "" {
-				activeIDCMap[idcName] = true
-			}
-		} else {
-			logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Skipping inactive/offline disk: %s (IDC: %s, IDC Active: %t, Online: %t)",
-				disk.String(), idcName, isMyIDCActive, storageInstance.IsOnline()))
-		}
-	}
-	activeIDCCount := len(activeIDCMap)
-	logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Total disks: %d, Active disks: %d from %d active IDCs", len(storageDisks), len(activeDisks), len(activeIDCMap)))
-
-	// 2. 동적 EC 설정 가져오기
-	var parityDrives int
-	var dataDrives int
-	switch {
-	case activeIDCCount >= 3:
-		parityDrives = 5                             // EC:12(7+5)
-		dataDrives = len(activeDisks) - parityDrives // 12 - 5 = 7
-		logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObjectIDC EC:12(7+5) activeIDCCount: %d, dataDrives: %d, parityDrives: %d", activeIDCCount, dataDrives, parityDrives))
-	case activeIDCCount == 2:
-		activeDisks = activeDisks[:7]                // 7개만 사용
-		parityDrives = 3                             // EC:7(4+3)
-		dataDrives = len(activeDisks) - parityDrives // 7 - 3 = 4
-		logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObjectIDC EC:7(4+3) activeIDCCount: %d, dataDrives: %d, parityDrives: %d", activeIDCCount, dataDrives, parityDrives))
-	default:
-		logger.LogIf(ctx, "erasureObjects.putObject", fmt.Errorf("[YBS] Error: Not enough active IDCs (%d) to perform write operation. Minimum 2 required", activeIDCCount))
-		// Use a specific error for IDC quorum failure if available, otherwise fallback
-		var errQuorumIDC error = errErasureWriteQuorum // Placeholder, define errErasureWriteQuorumIDC if needed
-		return ObjectInfo{}, toObjectErr(errQuorumIDC, bucket, object)
+	dataDrives, parityDrives, returnFlag := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
+	if returnFlag {
+		return ObjectInfo{}, toObjectErr(errErasureWriteQuorum, bucket, object)
 	}
 
 	// 3. 데이터/패리티 드라이브 및 쿼럼 재계산 (activeDisks 기준)
@@ -2220,6 +2125,56 @@ func (er erasureObjects) putObjectIDC(ctx context.Context, bucket string, object
 	fi.IsLatest = true
 
 	return fi.ToObjectInfo(bucket, object, opts.Versioned || opts.VersionSuspended), nil
+}
+
+func (er erasureObjects) GetActiveInfo(ctx context.Context, storageDisks []StorageAPI) ([]StorageAPI, map[string]bool, int) {
+	activeDisks := make([]StorageAPI, 0, len(storageDisks))
+	activeIDCMap := make(map[string]bool)
+	for _, disk := range storageDisks {
+		if disk == nil {
+			continue
+		}
+		storageInstance, ok := disk.(StorageAPI)
+		if !ok {
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS] GetActiveInfo Disk is not of type StorageAPI: %T", disk))
+			continue
+		}
+
+		isMyIDCActive, idcName := storageInstance.IsMyIDCActive()
+		if isMyIDCActive && storageInstance.IsOnline() {
+			activeDisks = append(activeDisks, disk)
+			if idcName != "" {
+				activeIDCMap[idcName] = true
+			}
+		} else {
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS] GetActiveInfo Skipping inactive/offline disk: %s (IDC: %s, IDC Active: %t, Online: %t)",
+				disk.String(), idcName, isMyIDCActive, storageInstance.IsOnline()))
+		}
+	}
+	return activeDisks, activeIDCMap, len(activeIDCMap)
+}
+
+func (er erasureObjects) DecideErasureCodingParameter(ctx context.Context, activeDisks []StorageAPI, activeIDCCount int) (int, int, bool) {
+	var dataBlocks, parityBlocks int
+	var returnFlag bool
+	switch {
+	case activeIDCCount >= 3:
+		parityBlocks = 5 // EC:12(7+5)
+		dataBlocks = len(activeDisks) - parityBlocks
+		returnFlag = false
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] DecideErasureCodingParameter EC:12(7+5) activeIDCCount: %d, dataBlocks: %d, parityBlocks: %d", activeIDCCount, dataBlocks, parityBlocks))
+	case activeIDCCount == 2:
+		activeDisks = activeDisks[:7]
+		parityBlocks = 3 // EC:7(4+3)
+		dataBlocks = len(activeDisks) - parityBlocks
+		returnFlag = false
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] DecideErasureCodingParameter EC:7(4+3) activeIDCCount: %d, dataBlocks: %d, parityBlocks: %d", activeIDCCount, dataBlocks, parityBlocks))
+	default:
+		returnFlag = true
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] DecideErasureCodingParameter Error: Not enough active IDCs (%d) to perform read operation. Minimum 2 required", activeIDCCount))
+	}
+
+	return dataBlocks, parityBlocks, returnFlag
 }
 
 func (er erasureObjects) putObject(ctx context.Context, bucket string, object string, r *PutObjReader, opts ObjectOptions) (objInfo ObjectInfo, err error) {
