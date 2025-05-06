@@ -1563,7 +1563,7 @@ func (er erasureObjects) CompleteMultipartUpload(ctx context.Context, bucket str
 		}
 	}
 
-	fi, partsMetadata, _, err := er.checkUploadIDExists(ctx, bucket, object, uploadID, true)
+	fi, partsMetadata, activeDisks, err := er.checkUploadIDExists(ctx, bucket, object, uploadID, true)
 	if err != nil {
 		if errors.Is(err, errVolumeNotFound) {
 			return oi, toObjectErr(err, bucket)
@@ -1573,7 +1573,7 @@ func (er erasureObjects) CompleteMultipartUpload(ctx context.Context, bucket str
 
 	uploadIDPath := er.getUploadIDDir(bucket, object, uploadID)
 	// onlineDisks := er.getDisks()
-	activeDisks, _, _ := er.GetActiveInfo(ctx, er.getDisks())
+	// activeDisks, _, _ := er.GetActiveInfo(ctx, er.getDisks())
 	writeQuorum := fi.WriteQuorum(er.defaultWQuorum())
 	readQuorum := fi.ReadQuorum(er.defaultRQuorum())
 
