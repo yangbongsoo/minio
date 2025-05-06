@@ -61,7 +61,7 @@ func (er erasureObjects) getMultipartSHADir(bucket, object string) string {
 }
 
 // checkUploadIDExists - verify if a given uploadID exists and is valid.
-func (er erasureObjects) checkUploadIDExists(ctx context.Context, bucket, object, uploadID string, write bool) (fi FileInfo, metArr []FileInfo, err error) {
+func (er erasureObjects) checkUploadIDExists(ctx context.Context, bucket, object, uploadID string, write bool) (fi FileInfo, metArr []FileInfo, activeDisks []StorageAPI, err error) {
 	defer func() {
 		if errors.Is(err, errFileNotFound) {
 			err = errUploadIDNotFound
@@ -84,15 +84,15 @@ func (er erasureObjects) checkUploadIDExists(ctx context.Context, bucket, object
 	writeQuorum := dataDrives
 	_ = parityDrives
 	if err != nil {
-		return fi, nil, err
+		return fi, nil, nil, err
 	}
 
 	if readQuorum < 0 {
-		return fi, nil, errErasureReadQuorum
+		return fi, nil, nil, errErasureReadQuorum
 	}
 
 	if writeQuorum < 0 {
-		return fi, nil, errErasureWriteQuorum
+		return fi, nil, nil, errErasureWriteQuorum
 	}
 
 	quorum := readQuorum
@@ -109,12 +109,12 @@ func (er erasureObjects) checkUploadIDExists(ctx context.Context, bucket, object
 		err = reduceReadQuorumErrs(ctx, errs, objectOpIgnoredErrs, readQuorum)
 	}
 	if err != nil {
-		return fi, nil, err
+		return fi, nil, nil, err
 	}
 
 	// Pick one from the first valid metadata.
 	fi, err = pickValidFileInfo(ctx, partsMetadata, modTime, etag, quorum)
-	return fi, partsMetadata, err
+	return fi, partsMetadata, activeDisks, err
 }
 
 func (er erasureObjects) checkUploadIDExistsOriginal(ctx context.Context, bucket, object, uploadID string, write bool) (fi FileInfo, metArr []FileInfo, err error) {
@@ -1032,7 +1032,7 @@ func (er erasureObjects) putObjectPartIDC(ctx context.Context, bucket string, ob
 
 	uploadIDPath := er.getUploadIDDir(bucket, object, uploadID)
 	// Validates if upload ID exists.
-	fi, _, err := er.checkUploadIDExists(ctx, bucket, object, uploadID, true)
+	fi, _, activeDisks, err := er.checkUploadIDExists(ctx, bucket, object, uploadID, true)
 	if err != nil {
 		logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObjectPartIDC err: %v", err))
 		if errors.Is(err, errVolumeNotFound) {
@@ -1042,7 +1042,6 @@ func (er erasureObjects) putObjectPartIDC(ctx context.Context, bucket string, ob
 	}
 
 	// onlineDisks := er.getDisks()
-	activeDisks, _, _ := er.GetActiveInfo(ctx, er.getDisks())
 	writeQuorum := fi.WriteQuorum(er.defaultWQuorum())
 	if cs := fi.Metadata[hash.MinIOMultipartChecksum]; cs != "" {
 		if r.ContentCRCType().String() != cs {
@@ -1244,7 +1243,7 @@ func (er erasureObjects) GetMultipartInfo(ctx context.Context, bucket, object, u
 		UploadID: uploadID,
 	}
 
-	fi, _, err := er.checkUploadIDExists(ctx, bucket, object, uploadID, false)
+	fi, _, _, err := er.checkUploadIDExists(ctx, bucket, object, uploadID, false)
 	if err != nil {
 		if errors.Is(err, errVolumeNotFound) {
 			return result, toObjectErr(err, bucket)
@@ -1323,7 +1322,7 @@ func (er erasureObjects) ListObjectParts(ctx context.Context, bucket, object, up
 		auditObjectErasureSet(ctx, "ListObjectParts", object, &er)
 	}
 
-	fi, _, err := er.checkUploadIDExists(ctx, bucket, object, uploadID, false)
+	fi, _, _, err := er.checkUploadIDExists(ctx, bucket, object, uploadID, false)
 	if err != nil {
 		return result, toObjectErr(err, bucket, object, uploadID)
 	}
@@ -1546,7 +1545,7 @@ func (er erasureObjects) CompleteMultipartUpload(ctx context.Context, bucket str
 		}
 	}
 
-	fi, partsMetadata, err := er.checkUploadIDExists(ctx, bucket, object, uploadID, true)
+	fi, partsMetadata, _, err := er.checkUploadIDExists(ctx, bucket, object, uploadID, true)
 	if err != nil {
 		if errors.Is(err, errVolumeNotFound) {
 			return oi, toObjectErr(err, bucket)
@@ -1914,7 +1913,7 @@ func (er erasureObjects) AbortMultipartUpload(ctx context.Context, bucket, objec
 	}
 
 	// Validates if upload ID exists.
-	if _, _, err = er.checkUploadIDExists(ctx, bucket, object, uploadID, false); err != nil {
+	if _, _, _, err = er.checkUploadIDExists(ctx, bucket, object, uploadID, false); err != nil {
 		if errors.Is(err, errVolumeNotFound) {
 			return toObjectErr(err, bucket)
 		}
