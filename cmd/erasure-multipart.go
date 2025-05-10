@@ -188,16 +188,18 @@ func (er erasureObjects) checkUploadIDExistsOriginal(ctx context.Context, bucket
 // cleanupMultipartPath removes all extraneous files and parts from the multipart folder, this is used per CompleteMultipart.
 // do not use this function outside of completeMultipartUpload()
 func (er erasureObjects) cleanupMultipartPath(ctx context.Context, paths ...string) {
-	storageDisks := er.getDisks()
-
-	g := errgroup.WithNErrs(len(storageDisks))
-	for index, disk := range storageDisks {
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] cleanupMultipartPath: %v", paths))
+	// storageDisks := er.getDisks()
+	activeDisks, _, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks())
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] cleanupMultipartPath activeDisks: %v, activeIDCCount: %v", activeDisks, activeIDCCount))
+	g := errgroup.WithNErrs(len(activeDisks))
+	for index, disk := range activeDisks {
 		if disk == nil {
 			continue
 		}
 		index := index
 		g.Go(func() error {
-			_ = storageDisks[index].DeleteBulk(ctx, minioMetaMultipartBucket, paths...)
+			_ = activeDisks[index].DeleteBulk(ctx, minioMetaMultipartBucket, paths...)
 			return nil
 		}, index)
 	}
