@@ -30,6 +30,7 @@ import (
 	"github.com/minio/madmin-go/v3"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/set"
+	"github.com/minio/minio/cmd/stat"
 	"github.com/minio/minio/internal/bpool"
 	"github.com/minio/minio/internal/bucket/bandwidth"
 	"github.com/minio/minio/internal/config"
@@ -485,6 +486,9 @@ var (
 		IDCInfoMap:   make(map[string]*IDCInfo),
 		TopologyPath: "/tmp/minio/topology/idc-topology.json",
 	}
+
+	// Multipart upload latency
+	multipartLatency = stat.NewMultipartUploadLatency()
 )
 
 func GetIDCInfo(idcName string) (*IDCInfo, bool) {

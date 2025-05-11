@@ -661,6 +661,14 @@ func (er erasureObjects) NewMultipartUpload(ctx context.Context, bucket, object 
 }
 
 func (er erasureObjects) newMultipartUploadIDC(ctx context.Context, bucket string, object string, opts ObjectOptions) (*NewMultipartUploadResult, error) {
+	modTime := opts.MTime
+	if opts.MTime.IsZero() {
+		modTime = UTCNow()
+	}
+	uploadUUID := fmt.Sprintf("%sx%d", mustGetUUID(), modTime.UnixNano())
+	uploadID := base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf("%s.%s", globalDeploymentID(), uploadUUID)))
+	multipartLatency.RecordMultipartStart(ctx, bucket, object, uploadID, time.Now())
+
 	if opts.CheckPrecondFn != nil {
 		if !opts.NoLock {
 			ns := er.NewNSLock(bucket, object)
@@ -744,10 +752,10 @@ func (er erasureObjects) newMultipartUploadIDC(ctx context.Context, bucket strin
 		userDefined[hash.MinIOMultipartChecksum] = opts.WantChecksum.Type.String()
 	}
 
-	modTime := opts.MTime
-	if opts.MTime.IsZero() {
-		modTime = UTCNow()
-	}
+	// modTime := opts.MTime
+	// if opts.MTime.IsZero() {
+	// 	modTime = UTCNow()
+	// }
 
 	activeDisks, partsMetadata = shuffleDisksAndPartsMetadata(activeDisks, partsMetadata, fi)
 
@@ -763,8 +771,8 @@ func (er erasureObjects) newMultipartUploadIDC(ctx context.Context, bucket strin
 		partsMetadata[index].ModTime = modTime
 		partsMetadata[index].Metadata = userDefined
 	}
-	uploadUUID := fmt.Sprintf("%sx%d", mustGetUUID(), modTime.UnixNano())
-	uploadID := base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf("%s.%s", globalDeploymentID(), uploadUUID)))
+	// uploadUUID := fmt.Sprintf("%sx%d", mustGetUUID(), modTime.UnixNano())
+	// uploadID := base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf("%s.%s", globalDeploymentID(), uploadUUID)))
 	uploadIDPath := er.getUploadIDDir(bucket, object, uploadUUID)
 
 	// Write updated `xl.meta` to all disks.
@@ -1043,6 +1051,7 @@ func (er erasureObjects) putObjectPart(ctx context.Context, bucket string, objec
 }
 
 func (er erasureObjects) putObjectPartIDC(ctx context.Context, bucket string, object string, uploadID string, partID int, r *PutObjReader, opts ObjectOptions, pi PartInfo, err error) (PartInfo, error) {
+	defer multipartLatency.MesurePutObjectPartElapsed(ctx, bucket, object, uploadID, partID)()
 	data := r.Reader
 	// Validate input data size and it can never be less than zero.
 	if data.Size() < -1 {
@@ -1540,6 +1549,8 @@ func objPartToPartErr(part ObjectPartInfo) error {
 //
 // Implements S3 compatible Complete multipart API.
 func (er erasureObjects) CompleteMultipartUpload(ctx context.Context, bucket string, object string, uploadID string, parts []CompletePart, opts ObjectOptions) (oi ObjectInfo, err error) {
+	defer multipartLatency.CompleteMultipartUploadLatency(ctx, bucket, object, uploadID)()
+
 	if !opts.NoAuditLog {
 		auditObjectErasureSet(ctx, "CompleteMultipartUpload", object, &er)
 	}
