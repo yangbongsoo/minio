@@ -187,11 +187,15 @@ func (er erasureObjects) checkUploadIDExistsOriginal(ctx context.Context, bucket
 
 // cleanupMultipartPath removes all extraneous files and parts from the multipart folder, this is used per CompleteMultipart.
 // do not use this function outside of completeMultipartUpload()
-func (er erasureObjects) cleanupMultipartPath(ctx context.Context, paths ...string) {
+func (er erasureObjects) cleanupMultipartPath(ctx context.Context, activeDisks []StorageAPI, paths ...string) {
 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] cleanupMultipartPath: %v", paths))
 	// storageDisks := er.getDisks()
-	activeDisks, _, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks())
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS] cleanupMultipartPath activeDisks: %v, activeIDCCount: %v", activeDisks, activeIDCCount))
+	// activeDisks, _, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks())
+	if len(activeDisks) == 0 {
+		activeDisks, _, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks())
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] cleanupMultipartPath activeDisks: %v, activeIDCCount: %v", activeDisks, activeIDCCount))
+	}
+
 	g := errgroup.WithNErrs(len(activeDisks))
 	for index, disk := range activeDisks {
 		if disk == nil {
@@ -794,7 +798,7 @@ func (er erasureObjects) renamePart(ctx context.Context, disks []StorageAPI, src
 	}
 
 	// cleanup existing paths first across all drives.
-	er.cleanupMultipartPath(ctx, paths...)
+	er.cleanupMultipartPath(ctx, disks, paths...)
 
 	g := errgroup.WithNErrs(len(disks))
 
@@ -814,7 +818,7 @@ func (er erasureObjects) renamePart(ctx context.Context, disks []StorageAPI, src
 
 	err := reduceWriteQuorumErrs(ctx, errs, objectOpIgnoredErrs, writeQuorum)
 	if err != nil {
-		er.cleanupMultipartPath(ctx, paths...)
+		er.cleanupMultipartPath(ctx, disks, paths...)
 	}
 
 	// We can safely allow RenameFile errors up to len(er.getDisks()) - writeQuorum
@@ -1874,7 +1878,7 @@ func (er erasureObjects) CompleteMultipartUpload(ctx context.Context, bucket str
 		defer lk.Unlock(lkctx)
 	}
 
-	er.cleanupMultipartPath(ctx, paths...) // cleanup all part.N.meta, and skipped part.N's before final rename().
+	er.cleanupMultipartPath(ctx, activeDisks, paths...) // cleanup all part.N.meta, and skipped part.N's before final rename().
 
 	defer func() {
 		if err == nil {
