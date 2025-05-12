@@ -20,6 +20,7 @@ package cmd
 import (
 	"crypto/x509"
 	"errors"
+	"github.com/minio/minio/cmd/stat"
 	"net/http"
 	"os"
 	"sync"
@@ -460,6 +461,8 @@ var (
 	globalDynamicAPIPort bool
 
 	// Add new variable global values here.
+	// Multipart upload latency
+	multipartLatency = stat.NewMultipartUploadLatency()
 )
 
 var globalAuthPluginMutex sync.Mutex
