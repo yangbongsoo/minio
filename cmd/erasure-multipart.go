@@ -1074,6 +1074,28 @@ func (er erasureObjects) putObjectPartIDC(ctx context.Context, bucket string, ob
 		return pi, toObjectErr(err, bucket, object, uploadID)
 	}
 
+	initialDataBlocksStr := fi.Metadata["ec_data_blocks"]
+	initialParityBlocksStr := fi.Metadata["ec_parity_blocks"]
+	if initialDataBlocksStr != "" && initialParityBlocksStr != "" {
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] initialDataBlocksStr: %s, initialParityBlocksStr: %s", initialDataBlocksStr, initialParityBlocksStr))
+		initialDataBlocks, _ := strconv.Atoi(initialDataBlocksStr)
+		initialParityBlocks, _ := strconv.Atoi(initialParityBlocksStr)
+
+		// 현재 활성 EC 파라미터와 비교
+		currentDataBlocks := fi.Erasure.DataBlocks
+		currentParityBlocks := fi.Erasure.ParityBlocks
+
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] currentDataBlocks: %d, currentParityBlocks: %d", currentDataBlocks, currentParityBlocks))
+
+		// EC 설정이 변경됐는지 확인
+		if initialDataBlocks != currentDataBlocks || initialParityBlocks != currentParityBlocks {
+			logger.LogIf(ctx, "", fmt.Errorf("EC configuration changed during multipart upload: initial[%d+%d] current[%d+%d]",
+				initialDataBlocks, initialParityBlocks, currentDataBlocks, currentParityBlocks))
+
+			return pi, toObjectErr(errors.New("IDC topology changed during upload - please abort and retry the multipart upload"), bucket, object, uploadID)
+		}
+	}
+
 	// onlineDisks := er.getDisks()
 	writeQuorum := fi.WriteQuorum(er.defaultWQuorum())
 	if cs := fi.Metadata[hash.MinIOMultipartChecksum]; cs != "" {
