@@ -11,6 +11,11 @@ import (
 	"github.com/minio/minio/internal/logger"
 )
 
+type MesureGetActiveInfo struct {
+	Tag     string        `json:"tag"`
+	Latency time.Duration `json:"latency"`
+}
+
 type RecordMultipartStart struct {
 	UploadID  string    `json:"uploadID"`
 	Bucket    string    `json:"bucket"`
@@ -71,6 +76,36 @@ func (m *MultipartUploadLatency) RecordMultipartStart(ctx context.Context, bucke
 	}()
 }
 
+func (m *MultipartUploadLatency) MesureGetActiveInfo(ctx context.Context, tag string) func() {
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] MesureGetActiveInfo"))
+	before := time.Now()
+	return func() {
+		getActiveInfoLatency := time.Since(before)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			lockChan := make(chan struct{})
+			go func() {
+				err := m.sendMesureGetActiveInfo(tag, getActiveInfoLatency)
+				if err != nil {
+					logger.LogIf(context.Background(), "", fmt.Errorf("[YBS] failed to send latency data: %v", err))
+					close(lockChan)
+					return
+				}
+
+				close(lockChan)
+			}()
+
+			select {
+			case <-lockChan:
+			case <-ctx.Done():
+				logger.LogIf(ctx, "", fmt.Errorf("[YBS] MesureGetActiveInfo timed out for tag: %s", tag))
+			}
+		}()
+	}
+}
+
 func (m *MultipartUploadLatency) MesurePutObjectPartElapsed(ctx context.Context, bucket, object, uploadID string, partID int) func() {
 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] MesurePutObjectPartElapsed bucket: %s, object: %s, uploadID: %s, partID: %d", bucket, object, uploadID, partID))
 	before := time.Now()
@@ -128,6 +163,20 @@ func (m *MultipartUploadLatency) CompleteMultipartUploadLatency(ctx context.Cont
 			}
 		}()
 	}
+}
+
+func (m *MultipartUploadLatency) sendMesureGetActiveInfo(tag string, getActiveInfoLatency time.Duration) error {
+	report := MesureGetActiveInfo{
+		Tag:     tag,
+		Latency: getActiveInfoLatency,
+	}
+	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS] send mesure get active info: %v", report))
+	data, err := json.Marshal(report)
+	if err != nil {
+		logger.LogIf(context.Background(), "", fmt.Errorf("[YBS] failed to marshal latency report: %v", err))
+		return err
+	}
+	return m.send(data, "/get-active-info-latency")
 }
 
 func (m *MultipartUploadLatency) sendRecordMultipartStart(bucket, object, uploadID string, startTime time.Time) error {

@@ -71,7 +71,7 @@ func (er erasureObjects) checkUploadIDExists(ctx context.Context, bucket, object
 	uploadIDPath := er.getUploadIDDir(bucket, object, uploadID)
 
 	// 1차: 현재 activeDisks로 partsMetadata를 읽음
-	activeDisks, _, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks())
+	activeDisks, _, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks(), "checkUploadIDExists")
 	activeDisks, dataDrives, parityDrives, _ := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
 
 	partsMetadata, errs := readAllFileInfo(ctx, activeDisks, bucket, minioMetaMultipartBucket,
@@ -192,7 +192,7 @@ func (er erasureObjects) cleanupMultipartPath(ctx context.Context, activeDisks [
 	// storageDisks := er.getDisks()
 	// activeDisks, _, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks())
 	if len(activeDisks) == 0 {
-		activeDisks, _, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks())
+		activeDisks, _, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks(), "cleanupMultipartPath")
 		logger.LogIf(ctx, "", fmt.Errorf("[YBS] cleanupMultipartPath activeDisks: %v, activeIDCCount: %v", activeDisks, activeIDCCount))
 	}
 
@@ -349,7 +349,7 @@ func (er erasureObjects) ListMultipartUploads(ctx context.Context, bucket, objec
 	var uploadIDs []string
 	var disk StorageAPI
 	// disks := er.getOnlineLocalDisks()
-	activeDisks, _, _ := er.GetActiveInfo(ctx, er.getDisks())
+	activeDisks, _, _ := er.GetActiveInfo(ctx, er.getDisks(), "ListMultipartUploads")
 	if len(activeDisks) == 0 {
 		// If no local, get non-healing disks.
 		var ok bool
@@ -699,7 +699,7 @@ func (er erasureObjects) newMultipartUploadIDC(ctx context.Context, bucket strin
 		userDefined["etag"] = opts.PreserveETag
 	}
 
-	activeDisks, _, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks())
+	activeDisks, _, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks(), "newMultipartUploadIDC")
 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] newMultipartUploadIDC activeDisks 갯수: %v", len(activeDisks)))
 
 	activeDisks, dataDrives, parityDrives, returnFlag := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
@@ -1406,7 +1406,7 @@ func (er erasureObjects) ListObjectParts(ctx context.Context, bucket, object, up
 	}
 
 	// onlineDisks := er.getDisks()
-	activeDisks, _, _ := er.GetActiveInfo(ctx, er.getDisks())
+	activeDisks, _, _ := er.GetActiveInfo(ctx, er.getDisks(), "listObjectPartsIDC")
 	readQuorum := fi.ReadQuorum(er.defaultRQuorum())
 	// Read Part info for all parts
 	partPath := pathJoin(uploadIDPath, fi.DataDir) + SlashSeparator

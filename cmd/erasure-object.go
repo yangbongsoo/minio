@@ -1060,7 +1060,7 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 		logger.LogIf(ctx, "", fmt.Errorf("[IDCInfo] IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
 	}
 
-	activeDisks, activeIDCMap, activeIDCCount := er.GetActiveInfo(ctx, disks)
+	activeDisks, activeIDCMap, activeIDCCount := er.GetActiveInfo(ctx, disks, "getObjectFileInfoIDC")
 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfoIDC Total disks: %d, Active disks: %d from %d active IDCs", len(disks), len(activeDisks), len(activeIDCMap)))
 
 	activeDisks, dataBlocks, _, returnFlag := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
@@ -1746,7 +1746,7 @@ func (er erasureObjects) putObjectIDC(ctx context.Context, bucket string, object
 		logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObejctIDC IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
 	}
 
-	activeDisks, activeIDCMap, activeIDCCount := er.GetActiveInfo(ctx, storageDisks)
+	activeDisks, activeIDCMap, activeIDCCount := er.GetActiveInfo(ctx, storageDisks, "putObjectIDC")
 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObjectIDC Total disks: %d, Active disks: %d from %d active IDCs", len(storageDisks), len(activeDisks), len(activeIDCMap)))
 
 	activeDisks, dataDrives, parityDrives, returnFlag := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
@@ -2126,7 +2126,8 @@ func (er erasureObjects) putObjectIDC(ctx context.Context, bucket string, object
 	return fi.ToObjectInfo(bucket, object, opts.Versioned || opts.VersionSuspended), nil
 }
 
-func (er erasureObjects) GetActiveInfo(ctx context.Context, storageDisks []StorageAPI) ([]StorageAPI, map[string]bool, int) {
+func (er erasureObjects) GetActiveInfo(ctx context.Context, storageDisks []StorageAPI, tag string) ([]StorageAPI, map[string]bool, int) {
+	defer multipartLatency.MesureGetActiveInfo(ctx, tag)()
 	activeDisks := make([]StorageAPI, 0, len(storageDisks))
 	activeIDCMap := make(map[string]bool)
 	for _, disk := range storageDisks {
