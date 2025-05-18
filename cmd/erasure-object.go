@@ -2127,6 +2127,7 @@ func (er erasureObjects) putObjectIDC(ctx context.Context, bucket string, object
 }
 
 func (er erasureObjects) GetActiveInfo(ctx context.Context, storageDisks []StorageAPI, tag string) ([]StorageAPI, map[string]bool, int) {
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] GetActiveInfo called %s", tag))
 	defer multipartLatency.MesureGetActiveInfo(ctx, tag)()
 	activeDisks := make([]StorageAPI, 0, len(storageDisks))
 	activeIDCMap := make(map[string]bool)

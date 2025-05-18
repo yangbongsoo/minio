@@ -71,6 +71,7 @@ func (er erasureObjects) checkUploadIDExists(ctx context.Context, bucket, object
 	uploadIDPath := er.getUploadIDDir(bucket, object, uploadID)
 
 	// 1차: 현재 activeDisks로 partsMetadata를 읽음
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] checkUploadIDExists 호출"))
 	activeDisks, _, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks(), "checkUploadIDExists")
 	activeDisks, dataDrives, parityDrives, _ := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
 
