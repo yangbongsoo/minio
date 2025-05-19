@@ -113,7 +113,7 @@ func (m *MultipartUploadLatency) MesureReadAllFileInfo(ctx context.Context, buck
 			select {
 			case <-lockChan:
 			case <-ctx.Done():
-				logger.LogIf(ctx, "", fmt.Errorf("[YBS] MesureReadAllFileInfo timed out for uploadID: %s", uploadID))
+				logger.LogIf(ctx, "", fmt.Errorf("[YBS] MesureReadAllFileInfo timed out for bucket: %s, object: %s", bucket, object))
 			}
 		}()
 	}
