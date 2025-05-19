@@ -194,6 +194,7 @@ func hashOrder(key string, cardinality int) []int {
 // Reads all `xl.meta` metadata as a FileInfo slice.
 // Returns error slice indicating the failed metadata reads.
 func readAllFileInfo(ctx context.Context, disks []StorageAPI, origbucket string, bucket, object, versionID string, readData, healing bool) ([]FileInfo, []error) {
+	defer multipartLatency.MesureReadAllFileInfo(ctx, bucket, object)()
 	metadataArray := make([]FileInfo, len(disks))
 
 	opts := ReadOptions{

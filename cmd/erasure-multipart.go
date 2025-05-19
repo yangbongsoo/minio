@@ -62,6 +62,7 @@ func (er erasureObjects) getMultipartSHADir(bucket, object string) string {
 
 // checkUploadIDExists - verify if a given uploadID exists and is valid.
 func (er erasureObjects) checkUploadIDExists(ctx context.Context, bucket, object, uploadID string, write bool) (fi FileInfo, metArr []FileInfo, activeDisks []StorageAPI, err error) {
+	defer multipartLatency.MesureCheckUploadIDExists(ctx, bucket, object, uploadID)()
 	defer func() {
 		if errors.Is(err, errFileNotFound) {
 			err = errUploadIDNotFound
@@ -143,14 +144,18 @@ func (er erasureObjects) checkUploadIDExistsOriginal(ctx context.Context, bucket
 		}
 	}()
 
+	// 초기화: 업로드 ID 디렉토리 경로 계산
 	uploadIDPath := er.getUploadIDDir(bucket, object, uploadID)
 
+	// 디스크 접근: 모든 디스크 가져오기
 	storageDisks := er.getDisks()
 
+	// 메타데이터 읽기: 모든 디스크에서 동시에 메타데이터 파일 읽기
 	// Read metadata associated with the object from all disks.
 	partsMetadata, errs := readAllFileInfo(ctx, storageDisks, bucket, minioMetaMultipartBucket,
 		uploadIDPath, "", false, false)
 
+	// 쿼럼 계산: 읽기/쓰기 연산에 필요한 쿼럼 결정
 	readQuorum, writeQuorum, err := objectQuorumFromMeta(ctx, partsMetadata, errs, er.defaultParityCount)
 	if err != nil {
 		return fi, nil, err
@@ -169,6 +174,7 @@ func (er erasureObjects) checkUploadIDExistsOriginal(ctx context.Context, bucket
 		quorum = writeQuorum
 	}
 
+	// 온라인 디스크 확인: 사용 가능한 디스크 파악 및 메타데이터 일관성 확인
 	// List all online disks.
 	_, modTime, etag := listOnlineDisks(storageDisks, partsMetadata, errs, quorum)
 
@@ -181,6 +187,7 @@ func (er erasureObjects) checkUploadIDExistsOriginal(ctx context.Context, bucket
 		return fi, nil, err
 	}
 
+	// 메타데이터 선택: 일관된 메타데이터 중 하나 선택
 	// Pick one from the first valid metadata.
 	fi, err = pickValidFileInfo(ctx, partsMetadata, modTime, etag, quorum)
 	return fi, partsMetadata, err

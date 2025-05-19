@@ -11,6 +11,19 @@ import (
 	"github.com/minio/minio/internal/logger"
 )
 
+type MesureCheckUploadIDExists struct {
+	UploadID                   string        `json:"uploadID"`
+	Bucket                     string        `json:"bucket"`
+	Object                     string        `json:"object"`
+	CheckUploadIDExistsLatency time.Duration `json:"checkUploadIDExistsLatency"`
+}
+
+type MesureReadAllFileInfo struct {
+	Bucket                 string        `json:"bucket"`
+	Object                 string        `json:"object"`
+	ReadAllFileInfoLatency time.Duration `json:"readAllFileInfoLatency"`
+}
+
 type MesureGetActiveInfo struct {
 	Tag     string        `json:"tag"`
 	Latency time.Duration `json:"latency"`
@@ -74,6 +87,66 @@ func (m *MultipartUploadLatency) RecordMultipartStart(ctx context.Context, bucke
 			logger.LogIf(ctx, "", fmt.Errorf("[YBS] RecordMultipartStart timed out for uploadID: %s", uploadID))
 		}
 	}()
+}
+
+func (m *MultipartUploadLatency) MesureReadAllFileInfo(ctx context.Context, bucket, object string) func() {
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] MesureReadAllFileInfo bucket: %s, object: %s", bucket, object))
+	before := time.Now()
+	return func() {
+		readAllFileInfoLatency := time.Since(before)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			lockChan := make(chan struct{})
+			go func() {
+				err := m.sendMesureReadAllFileInfo(bucket, object, readAllFileInfoLatency)
+				if err != nil {
+					logger.LogIf(context.Background(), "", fmt.Errorf("[YBS] failed to send latency data: %v", err))
+					close(lockChan)
+					return
+				}
+
+				close(lockChan)
+			}()
+
+			select {
+			case <-lockChan:
+			case <-ctx.Done():
+				logger.LogIf(ctx, "", fmt.Errorf("[YBS] MesureReadAllFileInfo timed out for uploadID: %s", uploadID))
+			}
+		}()
+	}
+}
+
+func (m *MultipartUploadLatency) MesureCheckUploadIDExists(ctx context.Context, bucket, object, uploadID string) func() {
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] MesureCheckUploadIDExists bucket: %s, object: %s, uploadID: %s", bucket, object, uploadID))
+	before := time.Now()
+	return func() {
+		checkUploadIDExistsLatency := time.Since(before)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			lockChan := make(chan struct{})
+			go func() {
+				err := m.sendMesureCheckUploadIDExists(bucket, object, uploadID, checkUploadIDExistsLatency)
+				if err != nil {
+					logger.LogIf(context.Background(), "", fmt.Errorf("[YBS] failed to send latency data: %v", err))
+					close(lockChan)
+					return
+				}
+
+				close(lockChan)
+			}()
+
+			select {
+			case <-lockChan:
+			case <-ctx.Done():
+				logger.LogIf(ctx, "", fmt.Errorf("[YBS] MesureCheckUploadIDExists timed out for uploadID: %s", uploadID))
+			}
+		}()
+	}
 }
 
 func (m *MultipartUploadLatency) MesureGetActiveInfo(ctx context.Context, tag string) func() {
@@ -163,6 +236,37 @@ func (m *MultipartUploadLatency) CompleteMultipartUploadLatency(ctx context.Cont
 			}
 		}()
 	}
+}
+
+func (m *MultipartUploadLatency) sendMesureCheckUploadIDExists(bucket, object, uploadID string, checkUploadIDExistsLatency time.Duration) error {
+	report := MesureCheckUploadIDExists{
+		UploadID:                   uploadID,
+		Bucket:                     bucket,
+		Object:                     object,
+		CheckUploadIDExistsLatency: checkUploadIDExistsLatency,
+	}
+	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS] send mesure check upload id exists: %v", report))
+	data, err := json.Marshal(report)
+	if err != nil {
+		logger.LogIf(context.Background(), "", fmt.Errorf("[YBS] failed to marshal latency report: %v", err))
+		return err
+	}
+	return m.send(data, "/check-upload-id-exists-latency")
+}
+
+func (m *MultipartUploadLatency) sendMesureReadAllFileInfo(bucket, object string, readAllFileInfoLatency time.Duration) error {
+	report := MesureReadAllFileInfo{
+		Bucket:                 bucket,
+		Object:                 object,
+		ReadAllFileInfoLatency: readAllFileInfoLatency,
+	}
+	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS] send mesure read all file info: %v", report))
+	data, err := json.Marshal(report)
+	if err != nil {
+		logger.LogIf(context.Background(), "", fmt.Errorf("[YBS] failed to marshal latency report: %v", err))
+		return err
+	}
+	return m.send(data, "/read-all-file-info-latency")
 }
 
 func (m *MultipartUploadLatency) sendMesureGetActiveInfo(tag string, getActiveInfoLatency time.Duration) error {
