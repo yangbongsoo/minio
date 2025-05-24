@@ -1872,9 +1872,11 @@ func (z *erasureServerPools) PutObjectPart(ctx context.Context, bucket, object, 
 	defer uploadIDRLock.RUnlock(rlkctx)
 
 	if z.SinglePool() {
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] SinglePool. PutObjectPart->z.serverPools[0].PutObjectPart bucket : %s AND object : %s", bucket, object))
 		return z.serverPools[0].PutObjectPart(ctx, bucket, object, uploadID, partID, data, opts)
 	}
 
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] PutObjectPart->len(z.serverPools) : %d", len(z.serverPools)))
 	for idx, pool := range z.serverPools {
 		if z.IsSuspended(idx) {
 			continue

@@ -92,11 +92,42 @@ func (er erasureObjects) checkUploadIDExists(ctx context.Context, bucket, object
 		logger.LogIf(ctx, "", fmt.Errorf("[YBS] checkUploadIDExists foundValidFI: %v", foundValidFI))
 		// 분포에 맞춰 activeDisks를 재정렬
 		if len(activeDisks) == len(foundValidFI.Erasure.Distribution) {
-			logger.LogIf(ctx, "", fmt.Errorf("[YBS] checkUploadIDExists shuffleDisks"))
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS] checkUploadIDExists shuffleDisks and reorder metadata (no second readAllFileInfo)"))
+
+			originalPartsMetadataForShuffle := make([]FileInfo, len(partsMetadata))
+			copy(originalPartsMetadataForShuffle, partsMetadata)
+			originalErrsForShuffle := make([]error, len(errs))
+			copy(originalErrsForShuffle, errs)
+
+			// activeDisks가 shuffleDisks에 의해 내부적으로 수정될 수 있으므로, oldActiveDisksForShuffle은 shuffleDisks 호출 전에 복사해야 합니다.
+			// 하지만 shuffleDisks는 새로운 슬라이스를 반환하므로 원본 activeDisks를 직접 수정하지 않습니다.
+			// 따라서 originalPartsMetadataForShuffle/originalErrsForShuffle이 현재 activeDisks 순서와 일치합니다.
+
 			activeDisks = shuffleDisks(activeDisks, foundValidFI.Erasure.Distribution)
-			// 다시 partsMetadata를 읽음 (분포 일치 보장)
-			partsMetadata, errs = readAllFileInfo(ctx, activeDisks, bucket, minioMetaMultipartBucket,
-				uploadIDPath, "", false, false)
+
+			newPartsMetadata := make([]FileInfo, len(originalPartsMetadataForShuffle))
+			newErrs := make([]error, len(originalErrsForShuffle))
+			distribution := foundValidFI.Erasure.Distribution
+
+			// Reorder metadata based on the original positions and the shuffle distribution.
+			// The disk originally at index `k` in the pre-shuffled `activeDisks` (and thus `originalPartsMetadataForShuffle[k]`)
+			// moves to index `distribution[k]-1` in the new `activeDisks`.
+			// So, newPartsMetadata at `distribution[k]-1` should get the metadata from `originalPartsMetadataForShuffle[k]`.
+			for k := 0; k < len(originalPartsMetadataForShuffle); k++ {
+				destIndex := distribution[k] - 1
+				if destIndex >= 0 && destIndex < len(newPartsMetadata) {
+					newPartsMetadata[destIndex] = originalPartsMetadataForShuffle[k]
+					newErrs[destIndex] = originalErrsForShuffle[k]
+				} else {
+					logger.LogIf(ctx, "", fmt.Errorf("internal error: shuffle distribution index %d (from original index k=%d with value distribution[k]=%d) out of bounds for metadata length %d", destIndex, k, distribution[k], len(newPartsMetadata)))
+					err = fmt.Errorf("internal error during metadata shuffle: distribution index %d out of bounds (original index k=%d, distribution[k]=%d)", destIndex, k, distribution[k])
+					return // Returns current fi, partsMetadata (metArr), activeDisks, and the just-set err.
+				}
+			}
+
+			partsMetadata = newPartsMetadata
+			errs = newErrs
+
 			dataDrives = foundValidFI.Erasure.DataBlocks
 			parityDrives = foundValidFI.Erasure.ParityBlocks
 		}
