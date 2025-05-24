@@ -62,24 +62,55 @@ func (er erasureObjects) getMultipartSHADir(bucket, object string) string {
 
 // checkUploadIDExists - verify if a given uploadID exists and is valid.
 func (er erasureObjects) checkUploadIDExists(ctx context.Context, bucket, object, uploadID string, write bool) (fi FileInfo, metArr []FileInfo, activeDisks []StorageAPI, err error) {
+	// <<< 로그 추가 지점 1 >>>
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists CALLED: bucket=%s, object=%s, uploadID=%s, write=%t", bucket, object, uploadID, write))
+
 	defer multipartLatency.MesureCheckUploadIDExists(ctx, bucket, object, uploadID, time.Now())()
 	defer func() {
 		if errors.Is(err, errFileNotFound) {
 			err = errUploadIDNotFound
 		}
+		// <<< 로그 추가 지점 2 >>>
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists RETURNING: bucket=%s, object=%s, uploadID=%s, write=%t, returning_err=%v", bucket, object, uploadID, write, err))
+		if err == nil && fi.IsValid() {
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists RETURNING FileInfo: Name=%s, Size=%d, Distribution=%v, Metadata=%v", fi.Name, fi.Size, fi.Erasure.Distribution, fi.Metadata))
+		} else if err == nil {
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists RETURNING FileInfo IS INVALID (err is nil). fi.Name=%s, fi.Size=%d, fi.Erasure.Distribution=%v", fi.Name, fi.Size, fi.Erasure.Distribution))
+		}
 	}()
 
 	uploadIDPath := er.getUploadIDDir(bucket, object, uploadID)
+	// <<< 로그 추가 지점 3 >>>
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists: uploadIDPath=%s, write=%t", uploadIDPath, write))
 
-	// 1차: 현재 activeDisks로 partsMetadata를 읽음
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS] checkUploadIDExists 호출"))
-	activeDisks, _, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks(), "checkUploadIDExists")
-	activeDisks, dataDrives, parityDrives, _ := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
+	// logger.LogIf(ctx, "", fmt.Errorf("[YBS] checkUploadIDExists 호출")) // 기존 로그
+	currentActiveDisks, _, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks(), "checkUploadIDExists")
+	// activeDisks 변수를 여기서 초기화합니다. currentActiveDisks는 임시 변수로 사용합니다.
+	activeDisks = currentActiveDisks
+	// DecideErasureCodingParameter는 activeDisks를 포함하여 4개의 값을 반환합니다.
+	var dataDrives, parityDrives int
+	var returnFlag bool
+	activeDisks, dataDrives, parityDrives, returnFlag = er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
+	// <<< 로그 추가 지점 4 >>>
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists: After DecideErasureCodingParameter. Initial activeDisks count=%d, dataDrives=%d, parityDrives=%d, activeIDCCount=%d, returnFlag=%t, write=%t", len(activeDisks), dataDrives, parityDrives, activeIDCCount, returnFlag, write))
 
 	partsMetadata, errs := readAllFileInfo(ctx, activeDisks, bucket, minioMetaMultipartBucket,
 		uploadIDPath, "", false, false)
+	// <<< 로그 추가 지점 5 >>>
+	validFIs := 0
+	var firstValidFIDistribution []int
+	var firstValidFIName string
+	for _, pm := range partsMetadata {
+		if pm.IsValid() {
+			validFIs++
+			if len(pm.Erasure.Distribution) > 0 && len(firstValidFIDistribution) == 0 {
+				firstValidFIDistribution = pm.Erasure.Distribution
+				firstValidFIName = pm.Name
+			}
+		}
+	}
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists: After first readAllFileInfo. uploadIDPath=%s, validFIs=%d, firstValidFIDistribution (Name: %s, Dist: %v), write=%t", uploadIDPath, validFIs, firstValidFIName, firstValidFIDistribution, write))
 
-	// partsMetadata에서 유효한 FileInfo가 있으면, 그 분포(Distribution)에 맞춰 activeDisks를 재정렬
 	var foundValidFI *FileInfo
 	for i := range partsMetadata {
 		if partsMetadata[i].IsValid() && len(partsMetadata[i].Erasure.Distribution) > 0 {
@@ -89,19 +120,19 @@ func (er erasureObjects) checkUploadIDExists(ctx context.Context, bucket, object
 	}
 
 	if foundValidFI != nil {
-		logger.LogIf(ctx, "", fmt.Errorf("[YBS] checkUploadIDExists foundValidFI: %v", foundValidFI))
-		// 분포에 맞춰 activeDisks를 재정렬
+		// logger.LogIf(ctx, "", fmt.Errorf("[YBS] checkUploadIDExists foundValidFI: %v", foundValidFI)) // 기존 로그, 아래 상세 로그로 대체 가능
+		// <<< 로그 추가 지점 6 >>>
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists: foundValidFI.Name=%s, Distribution=%v, Metadata=%v, write=%t", foundValidFI.Name, foundValidFI.Erasure.Distribution, foundValidFI.Metadata, write))
+
 		if len(activeDisks) == len(foundValidFI.Erasure.Distribution) {
-			logger.LogIf(ctx, "", fmt.Errorf("[YBS] checkUploadIDExists shuffleDisks and reorder metadata (no second readAllFileInfo)"))
+			// <<< 로그 추가 지점 7 (최적화 경로 진입) >>>
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists: Entering OPTIMIZED metadata reorder path. write=%t", write))
+			// logger.LogIf(ctx, "", fmt.Errorf("[YBS] checkUploadIDExists shuffleDisks and reorder metadata (no second readAllFileInfo)")) // 기존 로그
 
 			originalPartsMetadataForShuffle := make([]FileInfo, len(partsMetadata))
 			copy(originalPartsMetadataForShuffle, partsMetadata)
 			originalErrsForShuffle := make([]error, len(errs))
 			copy(originalErrsForShuffle, errs)
-
-			// activeDisks가 shuffleDisks에 의해 내부적으로 수정될 수 있으므로, oldActiveDisksForShuffle은 shuffleDisks 호출 전에 복사해야 합니다.
-			// 하지만 shuffleDisks는 새로운 슬라이스를 반환하므로 원본 activeDisks를 직접 수정하지 않습니다.
-			// 따라서 originalPartsMetadataForShuffle/originalErrsForShuffle이 현재 activeDisks 순서와 일치합니다.
 
 			activeDisks = shuffleDisks(activeDisks, foundValidFI.Erasure.Distribution)
 
@@ -109,62 +140,93 @@ func (er erasureObjects) checkUploadIDExists(ctx context.Context, bucket, object
 			newErrs := make([]error, len(originalErrsForShuffle))
 			distribution := foundValidFI.Erasure.Distribution
 
-			// Reorder metadata based on the original positions and the shuffle distribution.
-			// The disk originally at index `k` in the pre-shuffled `activeDisks` (and thus `originalPartsMetadataForShuffle[k]`)
-			// moves to index `distribution[k]-1` in the new `activeDisks`.
-			// So, newPartsMetadata at `distribution[k]-1` should get the metadata from `originalPartsMetadataForShuffle[k]`.
 			for k := 0; k < len(originalPartsMetadataForShuffle); k++ {
 				destIndex := distribution[k] - 1
 				if destIndex >= 0 && destIndex < len(newPartsMetadata) {
 					newPartsMetadata[destIndex] = originalPartsMetadataForShuffle[k]
 					newErrs[destIndex] = originalErrsForShuffle[k]
 				} else {
-					logger.LogIf(ctx, "", fmt.Errorf("internal error: shuffle distribution index %d (from original index k=%d with value distribution[k]=%d) out of bounds for metadata length %d", destIndex, k, distribution[k], len(newPartsMetadata)))
+					logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] internal error: shuffle distribution index %d (from original index k=%d with value distribution[k]=%d) out of bounds for metadata length %d, write=%t", destIndex, k, distribution[k], len(newPartsMetadata), write))
 					err = fmt.Errorf("internal error during metadata shuffle: distribution index %d out of bounds (original index k=%d, distribution[k]=%d)", destIndex, k, distribution[k])
-					return // Returns current fi, partsMetadata (metArr), activeDisks, and the just-set err.
+					return // fi, partsMetadata (metArr), activeDisks, err
 				}
 			}
-
 			partsMetadata = newPartsMetadata
 			errs = newErrs
-
 			dataDrives = foundValidFI.Erasure.DataBlocks
 			parityDrives = foundValidFI.Erasure.ParityBlocks
+		} else {
+			// <<< 로그 추가 지점 8 (최적화 경로 미진입 - 길이 불일치) >>>
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists: SKIPPED optimized path. Reason: len(activeDisks)=%d != len(foundValidFI.Erasure.Distribution)=%d. write=%t", len(activeDisks), len(foundValidFI.Erasure.Distribution), write))
+			// activeDisks는 이미 currentActiveDisks의 값으로 설정되어 있으므로 변경 필요 없음
 		}
+	} else {
+		// <<< 로그 추가 지점 9 (최적화 경로 미진입 - foundValidFI is nil) >>>
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists: SKIPPED optimized path. Reason: foundValidFI is nil. write=%t", write))
+		// activeDisks는 이미 currentActiveDisks의 값으로 설정되어 있으므로 변경 필요 없음
 	}
 
 	readQuorum := dataDrives
 	writeQuorum := dataDrives
-	_ = parityDrives
-	if err != nil {
-		return fi, nil, nil, err
-	}
+	// _ = parityDrives // 주석 처리된 변수는 그대로 둡니다.
+
+	// err 변수는 여기서 초기화되지 않고, 이전 로직(distribution index out of bounds)에서 설정되었을 수 있습니다.
+	// 이 부분을 명확히 하기 위해, 아래의 반환 전에 err이 설정되지 않았다면 nil이라고 가정합니다.
+	// 그러나 Go에서는 명명된 반환값을 사용하므로, err은 이미 특정 값을 가질 수 있습니다.
+	// 여기서는 추가적인 err 할당 없이 진행합니다.
 
 	if readQuorum < 0 {
-		return fi, nil, nil, errErasureReadQuorum
+		// <<< 로그 추가 지점 10 >>>
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists: readQuorum < 0 (%d), write=%t", readQuorum, write))
+		err = errErasureReadQuorum // 명시적으로 err 설정
+		return fi, partsMetadata, activeDisks, err
 	}
 
 	if writeQuorum < 0 {
-		return fi, nil, nil, errErasureWriteQuorum
+		// <<< 로그 추가 지점 11 >>>
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists: writeQuorum < 0 (%d), write=%t", writeQuorum, write))
+		err = errErasureWriteQuorum // 명시적으로 err 설정
+		return fi, partsMetadata, activeDisks, err
 	}
 
 	quorum := readQuorum
 	if write {
 		quorum = writeQuorum
 	}
+	// <<< 로그 추가 지점 12 >>>
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists: quorum=%d (write=%t)", quorum, write))
 
 	_, modTime, etag := listOnlineDisks(activeDisks, partsMetadata, errs, quorum)
-
-	if write {
-		err = reduceWriteQuorumErrs(ctx, errs, objectOpIgnoredErrs, writeQuorum)
-	} else {
-		err = reduceReadQuorumErrs(ctx, errs, objectOpIgnoredErrs, readQuorum)
+	// <<< 로그 추가 지점 13 >>>
+	validPMs := 0
+	for _, pm := range partsMetadata {
+		if pm.IsValid() {
+			validPMs++
+		}
 	}
-	if err != nil {
-		return fi, nil, nil, err
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists: Before pickValidFileInfo. activeDisks_len=%d, partsMetadata_valid_count=%d, quorum=%d, write=%t", len(activeDisks), validPMs, quorum, write))
+
+	var reduceErr error
+	if write {
+		reduceErr = reduceWriteQuorumErrs(ctx, errs, objectOpIgnoredErrs, writeQuorum)
+	} else {
+		reduceErr = reduceReadQuorumErrs(ctx, errs, objectOpIgnoredErrs, readQuorum)
+	}
+	if reduceErr != nil {
+		// <<< 로그 추가 지점 14 >>>
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists: reduceQuorumErrs failed: %v (write=%t)", reduceErr, write))
+		err = reduceErr // 명시적으로 err 설정
+		return fi, partsMetadata, activeDisks, err
 	}
 
 	fi, err = pickValidFileInfo(ctx, partsMetadata, modTime, etag, quorum)
+	// <<< 로그 추가 지점 15 >>>
+	if err != nil {
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists: pickValidFileInfo failed: %v, write=%t", err, write))
+	} else if !fi.IsValid() {
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DEBUG] checkUploadIDExists: pickValidFileInfo returned INVALID FileInfo (err is nil). fi.Name=%s, fi.Size=%d, fi.Erasure.Distribution=%v, write=%t", fi.Name, fi.Size, fi.Erasure.Distribution, write))
+	}
+	// err은 pickValidFileInfo에서 설정된 값을 그대로 사용
 	return fi, partsMetadata, activeDisks, err
 }
 
@@ -1094,6 +1156,8 @@ func (er erasureObjects) putObjectPart(ctx context.Context, bucket string, objec
 }
 
 func (er erasureObjects) putObjectPartIDC(ctx context.Context, bucket string, object string, uploadID string, partID int, r *PutObjReader, opts ObjectOptions, pi PartInfo, err error) (PartInfo, error) {
+	// [YBS_DEBUG] checkUploadIDExists CALLED 로그는 putObjectPartIDC의 스코프에 write 변수가 없으므로 제거합니다.
+	// checkUploadIDExists 함수 자체의 시작점에 유사한 로그가 이미 존재합니다.
 	defer multipartLatency.MesurePutObjectPartElapsed(ctx, bucket, object, uploadID, partID)()
 	data := r.Reader
 	// Validate input data size and it can never be less than zero.
