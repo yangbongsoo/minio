@@ -62,7 +62,7 @@ func (er erasureObjects) getMultipartSHADir(bucket, object string) string {
 
 // checkUploadIDExists - verify if a given uploadID exists and is valid.
 func (er erasureObjects) checkUploadIDExists(ctx context.Context, bucket, object, uploadID string, write bool) (fi FileInfo, metArr []FileInfo, activeDisks []StorageAPI, err error) {
-	defer multipartLatency.MesureCheckUploadIDExists(ctx, bucket, object, uploadID)()
+	defer multipartLatency.MesureCheckUploadIDExists(ctx, bucket, object, uploadID, time.Now())()
 	defer func() {
 		if errors.Is(err, errFileNotFound) {
 			err = errUploadIDNotFound

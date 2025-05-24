@@ -15,6 +15,8 @@ type MesureCheckUploadIDExists struct {
 	UploadID                   string        `json:"uploadID"`
 	Bucket                     string        `json:"bucket"`
 	Object                     string        `json:"object"`
+	StartTime                  time.Time     `json:"startTime"`
+	CompleteTime               time.Time     `json:"completeTime"`
 	CheckUploadIDExistsLatency time.Duration `json:"checkUploadIDExistsLatency"`
 }
 
@@ -119,18 +121,18 @@ func (m *MultipartUploadLatency) MesureReadAllFileInfo(ctx context.Context, buck
 	}
 }
 
-func (m *MultipartUploadLatency) MesureCheckUploadIDExists(ctx context.Context, bucket, object, uploadID string) func() {
+func (m *MultipartUploadLatency) MesureCheckUploadIDExists(ctx context.Context, bucket, object, uploadID string, startTime time.Time) func() {
 	logger.LogIf(ctx, "", fmt.Errorf("[YBS] MesureCheckUploadIDExists bucket: %s, object: %s, uploadID: %s", bucket, object, uploadID))
-	before := time.Now()
 	return func() {
-		checkUploadIDExistsLatency := time.Since(before)
+		completeTime := time.Now()
+		checkUploadIDExistsLatency := completeTime.Sub(startTime)
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
 			lockChan := make(chan struct{})
 			go func() {
-				err := m.sendMesureCheckUploadIDExists(bucket, object, uploadID, checkUploadIDExistsLatency)
+				err := m.sendMesureCheckUploadIDExists(bucket, object, uploadID, startTime, completeTime, checkUploadIDExistsLatency)
 				if err != nil {
 					logger.LogIf(context.Background(), "", fmt.Errorf("[YBS] failed to send latency data: %v", err))
 					close(lockChan)
@@ -238,11 +240,13 @@ func (m *MultipartUploadLatency) CompleteMultipartUploadLatency(ctx context.Cont
 	}
 }
 
-func (m *MultipartUploadLatency) sendMesureCheckUploadIDExists(bucket, object, uploadID string, checkUploadIDExistsLatency time.Duration) error {
+func (m *MultipartUploadLatency) sendMesureCheckUploadIDExists(bucket, object, uploadID string, startTime time.Time, completeTime time.Time, checkUploadIDExistsLatency time.Duration) error {
 	report := MesureCheckUploadIDExists{
 		UploadID:                   uploadID,
 		Bucket:                     bucket,
 		Object:                     object,
+		StartTime:                  startTime,
+		CompleteTime:               completeTime,
 		CheckUploadIDExistsLatency: checkUploadIDExistsLatency,
 	}
 	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS] send mesure check upload id exists: %v", report))
