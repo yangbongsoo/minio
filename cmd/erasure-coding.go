@@ -101,8 +101,10 @@ func (e *Erasure) DecodeDataBlocks(data [][]byte) error {
 	}
 	if isZero == 0 || isZero == len(data) {
 		// If all are zero, payload is 0 bytes.
+		logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC] DecodeDataBlocks: all are zero"))
 		return nil
 	}
+	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC] DecodeDataBlocks.ReconstructData called"))
 	return e.encoder().ReconstructData(data)
 }
 
