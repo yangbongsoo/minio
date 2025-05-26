@@ -1055,7 +1055,7 @@ func (er erasureObjects) getObjectFileInfoOriginal(ctx context.Context, bucket s
 
 func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string, object string, opts ObjectOptions, readData bool) (FileInfo, []FileInfo, []StorageAPI, error) {
 	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfoIDC called: %s/%s", bucket, object))
-	disks := waitForAllDisks(er.getDisks(), 12, 30*time.Second) // work around test
+	// disks := waitForAllDisks(er.getDisks(), 12, 30*time.Second) // work around test
 	//////
 
 	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfo.GetAllIDCInfo()"))
@@ -1063,8 +1063,8 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] [IDCInfo] IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
 	}
 
-	activeDisks, activeIDCMap, activeIDCCount := er.GetActiveInfo(ctx, disks, "getObjectFileInfoIDC")
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfoIDC Total disks: %d, Active disks: %d from %d active IDCs", len(disks), len(activeDisks), len(activeIDCMap)))
+	activeDisks, activeIDCMap, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks(), "getObjectFileInfoIDC")
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfoIDC Active disks: %d from %d active IDCs", len(activeDisks), len(activeIDCMap)))
 
 	activeDisks, dataBlocks, _, returnFlag := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
 	if returnFlag {
@@ -1743,14 +1743,12 @@ func (er erasureObjects) putObjectIDC(ctx context.Context, bucket string, object
 
 	userDefined := cloneMSS(opts.UserDefined)
 
-	storageDisks := waitForAllDisks(er.getDisks(), 12, 30*time.Second) // work around test
-
 	for idcName, idcInfo := range GetAllIDCInfo() {
 		logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObejctIDC IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
 	}
 
-	activeDisks, activeIDCMap, activeIDCCount := er.GetActiveInfo(ctx, storageDisks, "putObjectIDC")
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObjectIDC Total disks: %d, Active disks: %d from %d active IDCs", len(storageDisks), len(activeDisks), len(activeIDCMap)))
+	activeDisks, activeIDCMap, activeIDCCount := er.GetActiveInfo(ctx, er.getDisks(), "putObjectIDC")
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] putObjectIDC Active disks: %d from %d active IDCs", len(activeDisks), len(activeIDCMap)))
 
 	activeDisks, dataDrives, parityDrives, returnFlag := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
 	if returnFlag {
