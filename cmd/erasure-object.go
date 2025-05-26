@@ -430,7 +430,7 @@ func (er erasureObjects) getObjectWithFileInfo(ctx context.Context, bucket, obje
 
 // GetObjectInfo - reads object metadata and replies back ObjectInfo.
 func (er erasureObjects) GetObjectInfo(ctx context.Context, bucket, object string, opts ObjectOptions) (info ObjectInfo, err error) {
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] erasureObjects.GetObjectInfo CALLED: bucket=%s, object=%s, opts=%v", bucket, object, opts))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] erasureObjects.GetObjectInfo CALLED: bucket=%s, object=%s", bucket, object))
 	if !opts.NoAuditLog {
 		auditObjectErasureSet(ctx, "GetObjectInfo", object, &er)
 	}
@@ -743,7 +743,7 @@ func waitForAllDisks(disks []StorageAPI, expected int, maxWait time.Duration) []
 
 // getObjectInfo - wrapper for reading object metadata and constructs ObjectInfo.
 func (er erasureObjects) getObjectInfo(ctx context.Context, bucket, object string, opts ObjectOptions) (objInfo ObjectInfo, err error) {
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] erasureObjects.getObjectInfo CALLED: bucket=%s, object=%s, opts=%v", bucket, object, opts))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] erasureObjects.getObjectInfo CALLED: bucket=%s, object=%s", bucket, object))
 	fi, _, _, err := er.getObjectFileInfo(ctx, bucket, object, opts, false)
 	if err != nil {
 		return objInfo, toObjectErr(err, bucket, object)
@@ -761,12 +761,11 @@ func (er erasureObjects) getObjectInfo(ctx context.Context, bucket, object strin
 }
 
 func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object string, opts ObjectOptions, readData bool) (FileInfo, []FileInfo, []StorageAPI, error) {
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] erasureObjects.getObjectFileInfo CALLED: bucket=%s, object=%s, opts=%v, readData=%t", bucket, object, opts, readData))
 	if strings.HasPrefix(bucket, ".") || strings.HasPrefix(object, ".") {
-		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfo->getObjectFileInfoOriginal bucket : %s AND object : %s", bucket, object))
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfo->getObjectFileInfoOriginal bucket : %s AND object : %s", bucket, object))
 		return er.getObjectFileInfoOriginal(ctx, bucket, object, opts, readData)
 	} else {
-		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfo->getObjectFileInfoIDC bucket : %s AND object : %s", bucket, object))
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfo->getObjectFileInfoIDC bucket : %s AND object : %s, readData=%t", bucket, object, readData))
 		return er.getObjectFileInfoIDC(ctx, bucket, object, opts, readData)
 	}
 }
@@ -1054,11 +1053,7 @@ func (er erasureObjects) getObjectFileInfoOriginal(ctx context.Context, bucket s
 }
 
 func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string, object string, opts ObjectOptions, readData bool) (FileInfo, []FileInfo, []StorageAPI, error) {
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfoIDC called: %s/%s", bucket, object))
-	// disks := waitForAllDisks(er.getDisks(), 12, 30*time.Second) // work around test
-	//////
-
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfo.GetAllIDCInfo()"))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfoIDC called: %s/%s, readData=%t", bucket, object, readData))
 	for idcName, idcInfo := range GetAllIDCInfo() {
 		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] [IDCInfo] IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
 	}
