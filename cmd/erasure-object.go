@@ -430,6 +430,7 @@ func (er erasureObjects) getObjectWithFileInfo(ctx context.Context, bucket, obje
 
 // GetObjectInfo - reads object metadata and replies back ObjectInfo.
 func (er erasureObjects) GetObjectInfo(ctx context.Context, bucket, object string, opts ObjectOptions) (info ObjectInfo, err error) {
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] erasureObjects.GetObjectInfo CALLED: bucket=%s, object=%s, opts=%v", bucket, object, opts))
 	if !opts.NoAuditLog {
 		auditObjectErasureSet(ctx, "GetObjectInfo", object, &er)
 	}
@@ -742,6 +743,7 @@ func waitForAllDisks(disks []StorageAPI, expected int, maxWait time.Duration) []
 
 // getObjectInfo - wrapper for reading object metadata and constructs ObjectInfo.
 func (er erasureObjects) getObjectInfo(ctx context.Context, bucket, object string, opts ObjectOptions) (objInfo ObjectInfo, err error) {
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] erasureObjects.getObjectInfo CALLED: bucket=%s, object=%s, opts=%v", bucket, object, opts))
 	fi, _, _, err := er.getObjectFileInfo(ctx, bucket, object, opts, false)
 	if err != nil {
 		return objInfo, toObjectErr(err, bucket, object)
@@ -759,11 +761,12 @@ func (er erasureObjects) getObjectInfo(ctx context.Context, bucket, object strin
 }
 
 func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object string, opts ObjectOptions, readData bool) (FileInfo, []FileInfo, []StorageAPI, error) {
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] erasureObjects.getObjectFileInfo CALLED: bucket=%s, object=%s, opts=%v, readData=%t", bucket, object, opts, readData))
 	if strings.HasPrefix(bucket, ".") || strings.HasPrefix(object, ".") {
-		logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfo->getObjectFileInfoOriginal bucket : %s AND object : %s", bucket, object))
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfo->getObjectFileInfoOriginal bucket : %s AND object : %s", bucket, object))
 		return er.getObjectFileInfoOriginal(ctx, bucket, object, opts, readData)
 	} else {
-		logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfo->getObjectFileInfoIDC bucket : %s AND object : %s", bucket, object))
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfo->getObjectFileInfoIDC bucket : %s AND object : %s", bucket, object))
 		return er.getObjectFileInfoIDC(ctx, bucket, object, opts, readData)
 	}
 }
@@ -898,7 +901,7 @@ func (er erasureObjects) getObjectFileInfoOriginal(ctx context.Context, bucket s
 		logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo er.defaultParityCount: %d", er.defaultParityCount))
 		minDisks = er.setDriveCount - er.defaultParityCount
 	}
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo minDisks: %d", minDisks))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo minDisks: %d", minDisks))
 
 	calcQuorum := func(metaArr []FileInfo, errs []error) (FileInfo, []FileInfo, []StorageAPI, time.Time, string, error) {
 		readQuorum, _, err := objectQuorumFromMeta(ctx, metaArr, errs, er.defaultParityCount)
@@ -921,8 +924,8 @@ func (er erasureObjects) getObjectFileInfoOriginal(ctx context.Context, bucket s
 			}
 		}
 
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo onlineDisks: %v", onlineDisks))
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo len(onlineDisks): %v", len(onlineDisks)))
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo onlineDisks: %v", onlineDisks))
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo len(onlineDisks): %v", len(onlineDisks)))
 
 		return fi, onlineMeta, onlineDisks, modTime, etag, nil
 	}
@@ -1051,17 +1054,17 @@ func (er erasureObjects) getObjectFileInfoOriginal(ctx context.Context, bucket s
 }
 
 func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string, object string, opts ObjectOptions, readData bool) (FileInfo, []FileInfo, []StorageAPI, error) {
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfoIDC called: %s/%s", bucket, object))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfoIDC called: %s/%s", bucket, object))
 	disks := waitForAllDisks(er.getDisks(), 12, 30*time.Second) // work around test
 	//////
 
-	logger.LogIf(ctx, "", fmt.Errorf("getObjectFileInfo.GetAllIDCInfo()"))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfo.GetAllIDCInfo()"))
 	for idcName, idcInfo := range GetAllIDCInfo() {
-		logger.LogIf(ctx, "", fmt.Errorf("[IDCInfo] IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] [IDCInfo] IDC: %s, IDC Node Count: %d, Not Ready Node Count: %d, Is Active: %v", idcName, idcInfo.TotalNodeCount, idcInfo.NotReadyNodeCount, idcInfo.IsActive))
 	}
 
 	activeDisks, activeIDCMap, activeIDCCount := er.GetActiveInfo(ctx, disks, "getObjectFileInfoIDC")
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfoIDC Total disks: %d, Active disks: %d from %d active IDCs", len(disks), len(activeDisks), len(activeIDCMap)))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfoIDC Total disks: %d, Active disks: %d from %d active IDCs", len(disks), len(activeDisks), len(activeIDCMap)))
 
 	activeDisks, dataBlocks, _, returnFlag := er.DecideErasureCodingParameter(ctx, activeDisks, activeIDCCount)
 	if returnFlag {
@@ -1069,12 +1072,12 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 	}
 
 	if dataBlocks <= 0 || len(activeDisks) < dataBlocks {
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] Error: Not enough active disks (%d) for the calculated dataBlocks (%d)", len(activeDisks), dataBlocks))
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] Error: Not enough active disks (%d) for the calculated dataBlocks (%d)", len(activeDisks), dataBlocks))
 		return FileInfo{}, nil, nil, toObjectErr(errErasureReadQuorum, bucket, object)
 	}
 	// 3. 쿼럼 계산
 	minDisks := dataBlocks
-	logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo minDisks: %d", minDisks))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] erasureObjects.getObjectFileInfo minDisks: %d", minDisks))
 
 	///////
 	// rawArr := make([]RawFileInfo, er.setDriveCount)
@@ -1116,7 +1119,7 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 			}
 			isMyIDCActive, idcName := disk.IsMyIDCActive()
 			if !isMyIDCActive {
-				logger.LogIf(ctx, "", fmt.Errorf("[YBS] getObjectFileInfoIDC: Skipping inactive/offline disk: %s (IDC: %s, IDC Active: %t, Online: %t)",
+				logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] getObjectFileInfoIDC: Skipping inactive/offline disk: %s (IDC: %s, IDC Active: %t, Online: %t)",
 					disk.String(), idcName, isMyIDCActive, disk.IsOnline()))
 				done <- false
 				continue
@@ -1229,7 +1232,7 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 		}
 		// onlineDisks, modTime, etag := listOnlineDisks(disks, metaArr, errs, readQuorum)
 		onlineDisks, modTime, etag := listOnlineDisks(activeDisks, metaArr, errs, readQuorum)
-		logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfoIDC.calcQuorumFunc onlineDisks: %v", onlineDisks))
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] erasureObjects.getObjectFileInfoIDC.calcQuorumFunc onlineDisks: %v", onlineDisks))
 		fi, err := pickValidFileInfo(ctx, metaArr, modTime, etag, readQuorum)
 		if err != nil {
 			return FileInfo{}, nil, nil, time.Time{}, "", err
@@ -1325,9 +1328,9 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 		return fi, nil, nil, toObjectErr(err, bucket, object)
 	}
 
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo2 onlineDisks: %v", onlineDisks))
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo2 len(onlineDisks): %v", len(onlineDisks)))
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo2 fi.Erasure.Distribution: %v", fi.Erasure.Distribution))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] erasureObjects.getObjectFileInfo2 onlineDisks: %v", onlineDisks))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] erasureObjects.getObjectFileInfo2 len(onlineDisks): %v", len(onlineDisks)))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] erasureObjects.getObjectFileInfo2 fi.Erasure.Distribution: %v", fi.Erasure.Distribution))
 	/// 기존 로직
 	// if !fi.Deleted && len(fi.Erasure.Distribution) != len(onlineDisks) {
 	// 	err := fmt.Errorf("unexpected file distribution (%v) from online disks (%v), looks like backend disks have been manually modified refusing to heal %s/%s(%s)",
@@ -1359,7 +1362,7 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 			}
 		} // in all other cases metadata is corrupt, do not read from it.
 
-		logger.LogIf(ctx, "erasureObjects.getObjectFileInfo", fmt.Errorf("[YBS] erasureObjects.getObjectFileInfo CRIT!!!: %d", i))
+		logger.LogIf(ctx, "", fmt.Errorf("[YBS_DOWNLOAD] erasureObjects.getObjectFileInfo CRIT!!!: %d", i))
 		onlineMeta[i] = FileInfo{}
 		onlineDisks[i] = nil
 	}

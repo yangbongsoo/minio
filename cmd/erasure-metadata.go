@@ -89,6 +89,7 @@ func (fi FileInfo) IsValid() bool {
 
 // ToObjectInfo - Converts metadata to object info.
 func (fi FileInfo) ToObjectInfo(bucket, object string, versioned bool) ObjectInfo {
+	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_DOWNLOAD] FileInfo.ToObjectInfo CALLED: bucket=%s, object=%s, versioned=%t", bucket, object, versioned))
 	object = decodeDirObject(object)
 	versionID := fi.VersionID
 	if versioned && versionID == "" {
