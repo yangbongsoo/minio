@@ -99,12 +99,19 @@ func (e *Erasure) DecodeDataBlocks(data [][]byte) error {
 			break
 		}
 	}
-	if isZero == 0 || isZero == len(data) {
-		// If all are zero, payload is 0 bytes.
-		logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC] DecodeDataBlocks: all are zero"))
+
+	if isZero == 0 {
+		// 모든 블록 사용 가능 - Reed-Solomon 복원 불필요
+		logger.Info("[YBS_EC] DecodeDataBlocks: direct read (no reconstruction needed)")
 		return nil
 	}
-	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC] DecodeDataBlocks.ReconstructData called"))
+	if isZero == len(data) {
+		// 모든 블록이 비어있음 - 0 bytes payload
+		logger.Info("[YBS_EC] DecodeDataBlocks: all zero payload")
+		return nil
+	}
+	// 일부 블록 누락 - Reed-Solomon 복원 필요
+	logger.Info("[YBS_EC] DecodeDataBlocks: ReconstructData called (missing_blocks: %d/%d)", isZero, len(data))
 	return e.encoder().ReconstructData(data)
 }
 
