@@ -427,7 +427,17 @@ func (er erasureObjects) getObjectWithFileInfo(ctx context.Context, bucket, obje
 			// Prefer local disks
 			prefer[index] = disk.Hostname() == ""
 
-			logger.Info("[YBS_EC_CHECK] Index %d: reader created successfully (partPath: %s)", index, partPath)
+			// Enhanced logging to track reader-to-disk mapping
+			diskEndpoint := "unknown"
+			if disk != nil {
+				diskEndpoint = disk.String()
+			}
+			expectedECIndex := metaArr[index].Erasure.Index
+			logger.Info("[YBS_EC_CHECK] Index %d: reader created successfully", index)
+			logger.Info("[YBS_EC_CHECK]   → Disk: %s", diskEndpoint)
+			logger.Info("[YBS_EC_CHECK]   → Expected EC_Index: %d", expectedECIndex)
+			logger.Info("[YBS_EC_CHECK]   → PartPath: %s", partPath)
+			logger.Info("[YBS_EC_CHECK]   → IsLocal: %t", prefer[index])
 			validReaders++
 		}
 
@@ -1406,7 +1416,26 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 
 	// 중요: 오브젝트가 저장된 분포(Distribution)에 맞게 onlineDisks와 metaArr를 재정렬합니다.
 	// 이는 topology가 바뀌거나 IDC 상태가 바뀌더라도, 각 오브젝트의 원래 저장 형태에 맞게 읽을 수 있게 합니다.
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_EC_CHECK] Before shuffleDisksAndPartsMetadataByIndex:"))
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_EC_CHECK] Distribution from xl.meta: %v", fi.Erasure.Distribution))
+	for i, disk := range onlineDisks {
+		if disk != nil && i < len(onlineMeta) && onlineMeta[i].IsValid() {
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS_EC_CHECK]   Index[%d] → %s (EC_Index: %d)", i, disk.String(), onlineMeta[i].Erasure.Index))
+		} else {
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS_EC_CHECK]   Index[%d] → NIL or invalid", i))
+		}
+	}
+
 	onlineDisks, onlineMeta = shuffleDisksAndPartsMetadataByIndex(onlineDisks, onlineMeta, fi)
+
+	logger.LogIf(ctx, "", fmt.Errorf("[YBS_EC_CHECK] After shuffleDisksAndPartsMetadataByIndex:"))
+	for i, disk := range onlineDisks {
+		if disk != nil && i < len(onlineMeta) && onlineMeta[i].IsValid() {
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS_EC_CHECK]   Index[%d] → %s (EC_Index: %d) ✓", i, disk.String(), onlineMeta[i].Erasure.Index))
+		} else {
+			logger.LogIf(ctx, "", fmt.Errorf("[YBS_EC_CHECK]   Index[%d] → NIL or invalid ✗", i))
+		}
+	}
 
 	// 디스크의 XLV1 버전이 FileInfo의 XLV1 버전과 일치하는지 확인
 	filterOnlineDisksInplace(fi, onlineMeta, onlineDisks)

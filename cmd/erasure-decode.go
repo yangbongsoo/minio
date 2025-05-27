@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 
 	xioutil "github.com/minio/minio/internal/ioutil"
+	"github.com/minio/minio/internal/logger"
 )
 
 // Reads in parallel from readers.
@@ -59,6 +60,22 @@ func newParallelReader(readers []io.ReaderAt, e Erasure, offset, totalLength int
 		// Seed the buffers.
 		for i := range bufs {
 			bufs[i] = b[i*shardSize : (i+1)*shardSize]
+		}
+	}
+
+	// Log reader mapping information for debugging
+	logger.Info("[YBS_EC_CHECK] newParallelReader - Reader mapping (total: %d, dataBlocks: %d):", len(readers), e.dataBlocks)
+	for i, reader := range readers {
+		if reader != nil {
+			readerType := fmt.Sprintf("%T", reader)
+			// Try to extract disk endpoint information if possible
+			diskInfo := "unknown"
+			if sr, ok := reader.(*streamingBitrotReader); ok && sr != nil {
+				diskInfo = fmt.Sprintf("streamingBitrotReader(bufIdx:%d)", r2b[i])
+			}
+			logger.Info("[YBS_EC_CHECK]   Reader[%d] → %s (type: %s, bufIdx: %d)", i, diskInfo, readerType, r2b[i])
+		} else {
+			logger.Info("[YBS_EC_CHECK]   Reader[%d] → NIL (bufIdx: %d)", i, r2b[i])
 		}
 	}
 
@@ -158,6 +175,8 @@ func (p *parallelReader) Read(dst [][]byte) ([][]byte, error) {
 	// if readTrigger is true, it implies next disk.ReadAt() should be tried
 	// if readTrigger is false, it implies previous disk.ReadAt() was successful and there is no need
 	// to try reading the next disk.
+	successCount := int32(0) // Track successful reads
+	failureCount := int32(0) // Track failed reads
 	for readTrigger := range readTriggerCh {
 		newBufLK.RLock()
 		canDecode := p.canDecode(newBuf)
@@ -191,14 +210,41 @@ func (p *parallelReader) Read(dst [][]byte) ([][]byte, error) {
 			p.buf[bufIdx] = p.buf[bufIdx][:p.shardSize]
 			n, err := rr.ReadAt(p.buf[bufIdx], p.offset)
 			if err != nil {
+				atomic.AddInt32(&failureCount, 1)
+
+				// Enhanced logging with more detailed information
+				readerType := fmt.Sprintf("%T", rr)
+				diskInfo := "unknown"
+				diskEndpoint := "unknown"
+				if sr, ok := rr.(*streamingBitrotReader); ok && sr != nil {
+					diskInfo = fmt.Sprintf("streamingBitrotReader(volume:%s, path:%s)", sr.volume, sr.filePath)
+					if sr.disk != nil {
+						diskEndpoint = sr.disk.String()
+					}
+				}
+
+				logger.Info("[YBS_EC_CHECK] Reader[%d] ReadAt FAILED: %v", i, err)
+				logger.Info("[YBS_EC_CHECK]   → Offset: %d, BufIdx: %d, EC_position: %d", p.offset, bufIdx, bufIdx+1)
+				logger.Info("[YBS_EC_CHECK]   → ReaderType: %s", readerType)
+				logger.Info("[YBS_EC_CHECK]   → DiskInfo: %s", diskInfo)
+				logger.Info("[YBS_EC_CHECK]   → DiskEndpoint: %s", diskEndpoint)
+
+				// Log error classification
+				errorType := "unknown"
 				switch {
 				case errors.Is(err, errFileNotFound):
 					atomic.StoreInt32(&missingPartsHeal, 1)
+					errorType = "errFileNotFound"
 				case errors.Is(err, errFileCorrupt):
 					atomic.StoreInt32(&bitrotHeal, 1)
+					errorType = "errFileCorrupt"
 				case errors.Is(err, errDiskNotFound):
 					atomic.AddInt32(&disksNotFound, 1)
+					errorType = "errDiskNotFound"
+				default:
+					errorType = fmt.Sprintf("other: %v", err)
 				}
+				logger.Info("[YBS_EC_CHECK] Reader[%d] Error classified as: %s", i, errorType)
 
 				// This will be communicated upstream.
 				p.orgReaders[bufIdx] = nil
@@ -211,6 +257,18 @@ func (p *parallelReader) Read(dst [][]byte) ([][]byte, error) {
 				readTriggerCh <- true
 				return
 			}
+			atomic.AddInt32(&successCount, 1)
+
+			// Enhanced logging for successful reads
+			diskEndpoint := "unknown"
+			if sr, ok := rr.(*streamingBitrotReader); ok && sr != nil && sr.disk != nil {
+				diskEndpoint = sr.disk.String()
+			}
+
+			logger.Info("[YBS_EC_CHECK] Reader[%d] ReadAt SUCCESS: read %d bytes", i, n)
+			logger.Info("[YBS_EC_CHECK]   → Offset: %d, BufIdx: %d, EC_position: %d", p.offset, bufIdx, bufIdx+1)
+			logger.Info("[YBS_EC_CHECK]   → DiskEndpoint: %s", diskEndpoint)
+
 			newBufLK.Lock()
 			newBuf[bufIdx] = p.buf[bufIdx][:n]
 			newBufLK.Unlock()
@@ -220,6 +278,23 @@ func (p *parallelReader) Read(dst [][]byte) ([][]byte, error) {
 		readerIndex++
 	}
 	wg.Wait()
+
+	// Log final statistics only if there were any failures
+	if failureCount > 0 {
+		logger.Info("[YBS_EC_CHECK] parallelReader.Read completed - Success: %d, Failures: %d, CanDecode: %t",
+			successCount, failureCount, p.canDecode(newBuf))
+
+		// Log which buffers have data and which are empty
+		logger.Info("[YBS_EC_CHECK] Buffer status after read:")
+		for i, buf := range newBuf {
+			if len(buf) > 0 {
+				logger.Info("[YBS_EC_CHECK]   Buffer[%d] (EC_pos: %d): %d bytes ✓", i, i+1, len(buf))
+			} else {
+				logger.Info("[YBS_EC_CHECK]   Buffer[%d] (EC_pos: %d): EMPTY ✗", i, i+1)
+			}
+		}
+	}
+
 	if p.canDecode(newBuf) {
 		p.offset += p.shardSize
 		if missingPartsHeal == 1 {
