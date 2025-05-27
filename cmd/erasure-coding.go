@@ -92,6 +92,48 @@ func (e *Erasure) EncodeData(ctx context.Context, data []byte) ([][]byte, error)
 // It only decodes the data blocks but does not verify them.
 // It returns an error if the decoding failed.
 func (e *Erasure) DecodeDataBlocks(data [][]byte) error {
+	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK] DecodeDataBlocks called with %d total slots (dataBlocks: %d, parityBlocks: %d)",
+		len(data), e.dataBlocks, e.parityBlocks))
+
+	// 처음 e.dataBlocks개가 모두 사용 가능한지 체크
+	dataBlocksAvailable := 0
+	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK] Data blocks status:"))
+	for i := 0; i < e.dataBlocks && i < len(data); i++ {
+		if len(data[i]) > 0 {
+			dataBlocksAvailable++
+			logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK]   data[%d] (DataBlock): %d bytes ✓", i, len(data[i])))
+		} else {
+			logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK]   data[%d] (DataBlock): EMPTY ✗", i))
+			// break
+		}
+	}
+	// 패리티 블록 상태 확인
+	parityBlocksAvailable := 0
+	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK] Parity blocks status:"))
+	for i := e.dataBlocks; i < len(data); i++ {
+		if len(data[i]) > 0 {
+			parityBlocksAvailable++
+			logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK]   data[%d] (ParityBlock): %d bytes ✓", i, len(data[i])))
+		} else {
+			logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK]   data[%d] (ParityBlock): EMPTY ✗", i))
+		}
+	}
+
+	// 전체 상태 요약
+	totalAvailable := dataBlocksAvailable + parityBlocksAvailable
+	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK] Summary: DataBlocks=%d/%d, ParityBlocks=%d/%d, Total=%d/%d, CanDecode=%t",
+		dataBlocksAvailable, e.dataBlocks,
+		parityBlocksAvailable, e.parityBlocks,
+		totalAvailable, len(data),
+		totalAvailable >= e.dataBlocks))
+
+	if dataBlocksAvailable == e.dataBlocks {
+		// 모든 데이터 블록 사용 가능 - 복원 불필요
+		logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK] DecodeDataBlocks: direct read (data blocks complete)"))
+		return nil
+	}
+	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK] DecodeDataBlocks: reconstruct data blocks (data blocks available: %d/%d)", dataBlocksAvailable, e.dataBlocks))
+
 	isZero := 0
 	for _, b := range data {
 		if len(b) == 0 {
@@ -102,16 +144,16 @@ func (e *Erasure) DecodeDataBlocks(data [][]byte) error {
 
 	if isZero == 0 {
 		// 모든 블록 사용 가능 - Reed-Solomon 복원 불필요
-		logger.Info("[YBS_EC] DecodeDataBlocks: direct read (no reconstruction needed)")
+		logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK] DecodeDataBlocks: direct read (no reconstruction needed)"))
 		return nil
 	}
 	if isZero == len(data) {
 		// 모든 블록이 비어있음 - 0 bytes payload
-		logger.Info("[YBS_EC] DecodeDataBlocks: all zero payload")
+		logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK] DecodeDataBlocks: all zero payload"))
 		return nil
 	}
 	// 일부 블록 누락 - Reed-Solomon 복원 필요
-	logger.Info("[YBS_EC] DecodeDataBlocks: ReconstructData called (missing_blocks: %d/%d)", isZero, len(data))
+	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK] DecodeDataBlocks: ReconstructData called (missing_blocks: %d/%d)", isZero, len(data)))
 	return e.encoder().ReconstructData(data)
 }
 

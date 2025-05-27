@@ -144,7 +144,7 @@ func (p *parallelReader) canDecode(buf [][]byte) bool {
 func (p *parallelReader) Read(dst [][]byte) ([][]byte, error) {
 	newBuf := dst
 	if len(dst) != len(p.readers) {
-		newBuf = make([][]byte, len(p.readers))
+		newBuf = make([][]byte, len(p.readers)) // 7개 크기로 생성
 	} else {
 		for i := range newBuf {
 			newBuf[i] = newBuf[i][:0]
@@ -162,7 +162,7 @@ func (p *parallelReader) Read(dst [][]byte) ([][]byte, error) {
 	readTriggerCh := make(chan bool, len(p.readers))
 	defer xioutil.SafeClose(readTriggerCh) // close the channel upon return
 
-	for i := 0; i < p.dataBlocks; i++ {
+	for i := 0; i < p.dataBlocks; i++ { // 4개만 트리거 생성
 		// Setup read triggers for p.dataBlocks number of reads so that it reads in parallel.
 		readTriggerCh <- true
 	}
