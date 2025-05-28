@@ -305,43 +305,9 @@ func (er erasureObjects) GetObjectNInfo(ctx context.Context, bucket, object stri
 }
 
 func (er erasureObjects) getObjectWithFileInfo(ctx context.Context, bucket, object string, startOffset int64, length int64, writer io.Writer, fi FileInfo, metaArr []FileInfo, onlineDisks []StorageAPI) error {
-	// === 로그 1: 시작 상태 확인 ===
-	logger.Info("[YBS_EC_CHECK] getObjectWithFileInfo START - bucket: %s, object: %s", bucket, object)
-	logger.Info("[YBS_EC_CHECK] Initial activeDisks total count: %d", len(onlineDisks))
-
-	nilCount := 0
-	for i, disk := range onlineDisks {
-		if disk == nil || disk == OfflineDisk {
-			logger.Info("[YBS_EC_CHECK] Initial onlineDisks[%d] = nil/offline", i)
-			nilCount++
-		} else {
-			logger.Info("[YBS_EC_CHECK] Initial onlineDisks[%d] = %s", i, disk.String())
-		}
-	}
-	logger.Info("[YBS_EC_CHECK] Initial nil/offline disks: %d/%d", nilCount, len(onlineDisks))
-
-	// === 로그 2: Distribution 정보 ===
-	logger.Info("[YBS_EC_CHECK] xl.meta Distribution: %v", fi.Erasure.Distribution)
-	logger.Info("[YBS_EC_CHECK] DataBlocks: %d, ParityBlocks: %d", fi.Erasure.DataBlocks, fi.Erasure.ParityBlocks)
-
 	// Reorder online disks based on erasure distribution order.
 	// Reorder parts metadata based on erasure distribution order.
 	onlineDisks, metaArr = shuffleDisksAndPartsMetadataByIndex(onlineDisks, metaArr, fi)
-
-	// === 로그 3: Shuffle 후 상태 확인 (핵심!) ===
-	logger.Info("[YBS_EC_CHECK] After shuffleDisksAndPartsMetadataByIndex:")
-	logger.Info("[YBS_EC_CHECK] Shuffled activeDisks total count: %d", len(onlineDisks))
-
-	nilCountAfter := 0
-	for i, disk := range onlineDisks {
-		if disk == nil || disk == OfflineDisk {
-			logger.Info("[YBS_EC_CHECK] Shuffled onlineDisks[%d] = nil/offline", i)
-			nilCountAfter++
-		} else {
-			logger.Info("[YBS_EC_CHECK] Shuffled onlineDisks[%d] = %s", i, disk.String())
-		}
-	}
-	logger.Info("[YBS_EC_CHECK] Shuffled nil/offline disks: %d/%d", nilCountAfter, len(onlineDisks))
 
 	// For negative length read everything.
 	if length < 0 {
@@ -386,9 +352,6 @@ func (er erasureObjects) getObjectWithFileInfo(ctx context.Context, bucket, obje
 
 		partNumber := fi.Parts[partIndex].Number
 
-		// === 로그 4: Part별 처리 시작 ===
-		logger.Info("[YBS_EC_CHECK] Processing Part %d (partNumber: %d)", partIndex, partNumber)
-
 		// Save the current part name and size.
 		partSize := fi.Parts[partIndex].Size
 
@@ -402,21 +365,14 @@ func (er erasureObjects) getObjectWithFileInfo(ctx context.Context, bucket, obje
 		// Get the checksums of the current part.
 		readers := make([]io.ReaderAt, len(onlineDisks))
 		prefer := make([]bool, len(onlineDisks))
-
-		// === 로그 5: readers 배열 생성 과정 ===
-		validReaders := 0
 		for index, disk := range onlineDisks {
-			logger.Info("[YBS_EC_CHECK] Processing index %d - disk: %v", index, disk)
 			if disk == OfflineDisk {
-				logger.Info("[YBS_EC_CHECK] Index %d: disk is OfflineDisk - SKIP", index)
 				continue
 			}
 			if !metaArr[index].IsValid() {
-				logger.Info("[YBS_EC_CHECK] Index %d: metaArr is invalid - SKIP", index)
 				continue
 			}
 			if !metaArr[index].Erasure.Equal(fi.Erasure) {
-				logger.Info("[YBS_EC_CHECK] Index %d: Erasure not equal - SKIP", index)
 				continue
 			}
 			checksumInfo := metaArr[index].Erasure.GetChecksumInfo(partNumber)
@@ -426,40 +382,9 @@ func (er erasureObjects) getObjectWithFileInfo(ctx context.Context, bucket, obje
 
 			// Prefer local disks
 			prefer[index] = disk.Hostname() == ""
-
-			// Enhanced logging to track reader-to-disk mapping
-			diskEndpoint := "unknown"
-			if disk != nil {
-				diskEndpoint = disk.String()
-			}
-			expectedECIndex := metaArr[index].Erasure.Index
-			logger.Info("[YBS_EC_CHECK] Index %d: reader created successfully", index)
-			logger.Info("[YBS_EC_CHECK]   → Disk: %s", diskEndpoint)
-			logger.Info("[YBS_EC_CHECK]   → Expected EC_Index: %d", expectedECIndex)
-			logger.Info("[YBS_EC_CHECK]   → PartPath: %s", partPath)
-			logger.Info("[YBS_EC_CHECK]   → IsLocal: %t", prefer[index])
-			validReaders++
 		}
-
-		// === 로그 6: readers 배열 최종 상태 ===
-		logger.Info("[YBS_EC_CHECK] Final readers array for Part %d:", partIndex)
-		logger.Info("[YBS_EC_CHECK] Total valid readers: %d/%d", validReaders, len(readers))
-		for i, reader := range readers {
-			if reader == nil {
-				logger.Info("[YBS_EC_CHECK] readers[%d] = nil", i)
-			} else {
-				logger.Info("[YBS_EC_CHECK] readers[%d] = valid", i)
-			}
-		}
-
-		// === 로그 7: erasure.Decode 호출 전 ===
-		logger.Info("[YBS_EC_CHECK] Calling erasure.Decode - partOffset: %d, partLength: %d, partSize: %d", partOffset, partLength, partSize)
 
 		written, err := erasure.Decode(ctx, writer, readers, partOffset, partLength, partSize, prefer)
-
-		// === 로그 8: erasure.Decode 결과 ===
-		logger.Info("[YBS_EC_CHECK] erasure.Decode completed - written: %d, err: %v", written, err)
-
 		// Note: we should not be defer'ing the following closeBitrotReaders() call as
 		// we are inside a for loop i.e if we use defer, we would accumulate a lot of open files by the time
 		// we return from this function.
@@ -471,7 +396,6 @@ func (er erasureObjects) getObjectWithFileInfo(ctx context.Context, bucket, obje
 			// - attempt a heal to successfully heal them for future calls.
 			if written == partLength {
 				if errors.Is(err, errFileNotFound) || errors.Is(err, errFileCorrupt) {
-					logger.Info("[YBS_EC_CHECK] Triggering healing - err: %v", err)
 					healOnce.Do(func() {
 						globalMRFState.addPartialOp(PartialOperation{
 							Bucket:     bucket,
@@ -491,7 +415,6 @@ func (er erasureObjects) getObjectWithFileInfo(ctx context.Context, bucket, obje
 				}
 			}
 			if err != nil {
-				logger.Info("[YBS_EC_CHECK] Returning error: %v", err)
 				return toObjectErr(err, bucket, object)
 			}
 		}
@@ -501,8 +424,6 @@ func (er erasureObjects) getObjectWithFileInfo(ctx context.Context, bucket, obje
 		// the remaining parts.
 		partOffset = 0
 	} // End of read all parts loop.
-
-	logger.Info("[YBS_EC_CHECK] getObjectWithFileInfo completed successfully")
 	// Return success.
 	return nil
 }
@@ -1416,26 +1337,7 @@ func (er erasureObjects) getObjectFileInfoIDC(ctx context.Context, bucket string
 
 	// 중요: 오브젝트가 저장된 분포(Distribution)에 맞게 onlineDisks와 metaArr를 재정렬합니다.
 	// 이는 topology가 바뀌거나 IDC 상태가 바뀌더라도, 각 오브젝트의 원래 저장 형태에 맞게 읽을 수 있게 합니다.
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS_EC_CHECK] Before shuffleDisksAndPartsMetadataByIndex:"))
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS_EC_CHECK] Distribution from xl.meta: %v", fi.Erasure.Distribution))
-	for i, disk := range onlineDisks {
-		if disk != nil && i < len(onlineMeta) && onlineMeta[i].IsValid() {
-			logger.LogIf(ctx, "", fmt.Errorf("[YBS_EC_CHECK]   Index[%d] → %s (EC_Index: %d)", i, disk.String(), onlineMeta[i].Erasure.Index))
-		} else {
-			logger.LogIf(ctx, "", fmt.Errorf("[YBS_EC_CHECK]   Index[%d] → NIL or invalid", i))
-		}
-	}
-
 	onlineDisks, onlineMeta = shuffleDisksAndPartsMetadataByIndex(onlineDisks, onlineMeta, fi)
-
-	logger.LogIf(ctx, "", fmt.Errorf("[YBS_EC_CHECK] After shuffleDisksAndPartsMetadataByIndex:"))
-	for i, disk := range onlineDisks {
-		if disk != nil && i < len(onlineMeta) && onlineMeta[i].IsValid() {
-			logger.LogIf(ctx, "", fmt.Errorf("[YBS_EC_CHECK]   Index[%d] → %s (EC_Index: %d) ✓", i, disk.String(), onlineMeta[i].Erasure.Index))
-		} else {
-			logger.LogIf(ctx, "", fmt.Errorf("[YBS_EC_CHECK]   Index[%d] → NIL or invalid ✗", i))
-		}
-	}
 
 	// 디스크의 XLV1 버전이 FileInfo의 XLV1 버전과 일치하는지 확인
 	filterOnlineDisksInplace(fi, onlineMeta, onlineDisks)
