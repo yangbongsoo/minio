@@ -127,13 +127,6 @@ func (e *Erasure) DecodeDataBlocks(data [][]byte) error {
 		totalAvailable, len(data),
 		totalAvailable >= e.dataBlocks))
 
-	if dataBlocksAvailable == e.dataBlocks {
-		// 모든 데이터 블록 사용 가능 - 복원 불필요
-		logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK] DecodeDataBlocks: direct read (data blocks complete)"))
-		return nil
-	}
-	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK] DecodeDataBlocks: reconstruct data blocks (data blocks available: %d/%d)", dataBlocksAvailable, e.dataBlocks))
-
 	isZero := 0
 	for _, b := range data {
 		if len(b) == 0 {
@@ -152,8 +145,7 @@ func (e *Erasure) DecodeDataBlocks(data [][]byte) error {
 		logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK] DecodeDataBlocks: all zero payload"))
 		return nil
 	}
-	// 일부 블록 누락 - Reed-Solomon 복원 필요
-	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK] DecodeDataBlocks: ReconstructData called (missing_blocks: %d/%d)", isZero, len(data)))
+	logger.LogIf(context.Background(), "", fmt.Errorf("[YBS_EC_CHECK] DecodeDataBlocks: reconstruct data blocks (data blocks available: %d/%d)", dataBlocksAvailable, e.dataBlocks))
 	return e.encoder().ReconstructData(data)
 }
 
