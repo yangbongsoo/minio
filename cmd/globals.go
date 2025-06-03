@@ -489,6 +489,9 @@ var (
 
 	// Multipart upload latency
 	multipartLatency = stat.NewMultipartUploadLatency()
+
+	// Download latency
+	downloadLatency = stat.NewDownloadLatency()
 )
 
 func GetIDCInfo(idcName string) (*IDCInfo, bool) {
