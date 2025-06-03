@@ -305,6 +305,8 @@ func (er erasureObjects) GetObjectNInfo(ctx context.Context, bucket, object stri
 }
 
 func (er erasureObjects) getObjectWithFileInfo(ctx context.Context, bucket, object string, startOffset int64, length int64, writer io.Writer, fi FileInfo, metaArr []FileInfo, onlineDisks []StorageAPI) error {
+	defer downloadLatency.MesureGetObjectWithFileInfo(ctx, bucket, object)()
+
 	// Reorder online disks based on erasure distribution order.
 	// Reorder parts metadata based on erasure distribution order.
 	onlineDisks, metaArr = shuffleDisksAndPartsMetadataByIndex(onlineDisks, metaArr, fi)
@@ -384,7 +386,10 @@ func (er erasureObjects) getObjectWithFileInfo(ctx context.Context, bucket, obje
 			prefer[index] = disk.Hostname() == ""
 		}
 
+		erasureDecodeStart := time.Now()
 		written, err := erasure.Decode(ctx, writer, readers, partOffset, partLength, partSize, prefer)
+		eachPartErasureDecodeTime := time.Since(erasureDecodeStart)
+		downloadLatency.MesureErasureDecodeEachPart(ctx, bucket, object, partIndex, eachPartErasureDecodeTime)
 		// Note: we should not be defer'ing the following closeBitrotReaders() call as
 		// we are inside a for loop i.e if we use defer, we would accumulate a lot of open files by the time
 		// we return from this function.
@@ -703,6 +708,11 @@ func readAllXL(ctx context.Context, disks []StorageAPI, bucket, object string, r
 }
 
 func (er erasureObjects) getObjectFileInfo(ctx context.Context, bucket, object string, opts ObjectOptions, readData bool) (FileInfo, []FileInfo, []StorageAPI, error) {
+	caller := "unknown"
+	if callerValue := ctx.Value("caller"); callerValue != nil {
+		caller = callerValue.(string)
+	}
+	defer downloadLatency.MesureGetObjectFileInfo(ctx, bucket, object, caller)()
 	rawArr := make([]RawFileInfo, er.setDriveCount)
 	metaArr := make([]FileInfo, er.setDriveCount)
 	errs := make([]error, er.setDriveCount)

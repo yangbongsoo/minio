@@ -463,6 +463,9 @@ var (
 	// Add new variable global values here.
 	// Multipart upload latency
 	multipartLatency = stat.NewMultipartUploadLatency()
+
+	// Download latency
+	downloadLatency = stat.NewDownloadLatency()
 )
 
 var globalAuthPluginMutex sync.Mutex
